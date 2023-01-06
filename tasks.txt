@@ -1,0 +1,20 @@
+TODOs:
+### WEBHOOK ###
+- Set up the flask app and open port.
+
+--- New Booking ---
+1. Close availability on other channels.
+2. Text correct cleaner.
+
+--- Canceled Booking ---
+1. Re-open availability on other channels.
+2. Text correct cleaner
+
+--- Changed Booking ---
+1. Which change?
+2. Text correct cleaner if relevant
+
+### MESSAGING ###
+-
+### REPORTING ###
+- Make the database data exportable to Excel.
