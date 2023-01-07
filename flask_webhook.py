@@ -1,6 +1,5 @@
 from flask import Flask, request, json
 from flask_ngrok import run_with_ngrok
-from manager import Manager
 import logging
 import datetime
 
