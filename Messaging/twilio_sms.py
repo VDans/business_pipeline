@@ -1,12 +1,8 @@
-import json
 from twilio.rest import Client
-from twilio.twiml.messaging_response import Body, Media, Message, MessagingResponse
-
-secrets = json.load(open('../config_secrets.json'))
 
 
 class SmsEngine:
-    def __init__(self, unit_id: str = None):
+    def __init__(self, secrets, unit_id: str = None):
         """
 
         :param topic: Can be "financials", "confirmation", "check_in", "check_out"

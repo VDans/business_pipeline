@@ -8,11 +8,11 @@ from Messaging.twilio_sms import SmsEngine
 logging.basicConfig(level=logging.INFO)
 
 resources = json.load(open('Databases/resources_help.json'))
+secrets = json.load(open('config_secrets.json'))
 
 app = Flask(__name__)
-# run_with_ngrok(app)  # Start ngrok when app is run?
 
-sms = SmsEngine()
+sms = SmsEngine(secrets=secrets)
 
 
 @app.route('/')
@@ -72,4 +72,4 @@ def receive_data():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
