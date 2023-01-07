@@ -2,11 +2,11 @@ import json
 from twilio.rest import Client
 from twilio.twiml.messaging_response import Body, Media, Message, MessagingResponse
 
-secrets = json.load(open('secrets.json'))
+secrets = json.load(open('../secrets.json'))
 
 
 class SmsEngine:
-    def __init__(self, unit_id: str):
+    def __init__(self, unit_id: str = None):
         """
 
         :param topic: Can be "financials", "confirmation", "check_in", "check_out"
@@ -33,3 +33,11 @@ class SmsEngine:
 
         else:
             NotImplementedError("In Development...")
+
+    def new_booking_sms(self, unit, name, from_date, to_date):
+        body = f"New Booking: {name}\nFlat: {unit}\nCheck-In: {from_date} \nCheck-Out: {to_date}"
+        self.client.messages.create(
+            body=body,
+            from_='+17816307516',
+            to='+436601644192'
+        )
