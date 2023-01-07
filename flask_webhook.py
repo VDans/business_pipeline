@@ -8,7 +8,7 @@ from Messaging.twilio_sms import SmsEngine
 
 logging.basicConfig(level=logging.INFO)
 
-resources = json.load(open('../Databases/resources_help.json'))
+resources = json.load(open('Databases/resources_help.json'))
 
 app = Flask(__name__)
 # run_with_ngrok(app)  # Start ngrok when app is run?
