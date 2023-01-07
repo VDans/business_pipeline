@@ -20,7 +20,7 @@ options.add_argument('lang=en-US')
 # options.add_argument("--headless")
 # options.add_argument("--disable-gpu")
 
-secrets = json.load(open('../secrets.json'))
+secrets = json.load(open('../config_secrets.json'))
 resources = json.load(open('../Databases/resources_help.json'))
 
 

@@ -1,7 +1,7 @@
 import requests as req
 import json
 
-secrets = json.load(open('../secrets.json'))
+secrets = json.load(open('../config_secrets.json'))
 
 
 class Whatsapp:

@@ -4,7 +4,7 @@ from flask import Flask, request, redirect
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.rest import Client
 
-secrets = json.load(open('../secrets.json'))
+secrets = json.load(open('../config_secrets.json'))
 
 
 class Whatsapp:

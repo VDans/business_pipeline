@@ -2,7 +2,7 @@ import requests
 import json
 import pandas as pd
 
-# secrets = json.load(open('../secrets.json'))
+# secrets = json.load(open('../config_secrets.json'))
 # API_KEY = secrets["rentlio"]["api_key"]
 
 

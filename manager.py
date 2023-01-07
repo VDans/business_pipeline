@@ -8,7 +8,7 @@ from Messaging.twilio_whatsapp import Whatsapp
 from Financials.financials import Financials
 from sqlalchemy import types
 
-secrets = json.load(open('../secrets.json'))
+secrets = json.load(open('../config_secrets.json'))
 resources = json.load(open('../Databases/resources_help.json'))
 
 

@@ -2,7 +2,7 @@ import json
 from twilio.rest import Client
 from twilio.twiml.messaging_response import Body, Media, Message, MessagingResponse
 
-secrets = json.load(open('../secrets.json'))
+secrets = json.load(open('../config_secrets.json'))
 
 
 class SmsEngine:
