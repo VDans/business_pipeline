@@ -13,5 +13,23 @@
     "7332800": "Erdbergstrasse 118/32, 1030 Wien",
     "9289798": "Geiselbergstrasse 28/3/124, 1110 Wien",
     "9347180": "Geiselbergstrasse 28/3/125, 1110 Wien"
+  },
+  "rentlio_events": {
+    "ota-reservation-received": "New Booking",
+    "reservation-created": "New Booking",
+    "reservation-updated": "Modified Booking",
+    "reservation-canceled": "Canceled Booking",
+    "ota-reservation-modified": "Modified Booking",
+    "ota-reservation-canceled": "Canceled Booking",
+    "guest-checkedIn-on": "Check-In Confirmed",
+    "guest-checkedIn-off": "Check-In Canceled",
+    "guest-checkedOut-on": "Check-Out Confirmed",
+    "guest-checkedOut-off": "Check-Out Canceled"
+  },
+  "rentlio_properties": {
+    "22636": "EBS32",
+    "22637": "HMG28",
+    "22638": "GBS124",
+    "22639": "GBS125"
   }
 }

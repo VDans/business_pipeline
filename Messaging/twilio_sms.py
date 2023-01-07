@@ -34,8 +34,8 @@ class SmsEngine:
         else:
             NotImplementedError("In Development...")
 
-    def new_booking_sms(self, unit, name, from_date, to_date):
-        body = f"New Booking: {name}\nFlat: {unit}\nCheck-In: {from_date} \nCheck-Out: {to_date}"
+    def new_booking_sms(self, event, unit, name, from_date, to_date):
+        body = f"{event}: {name}\nFlat: {unit}\nCheck-In: {from_date} \nCheck-Out: {to_date}"
         self.client.messages.create(
             body=body,
             from_='+17816307516',
