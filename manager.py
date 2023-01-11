@@ -8,9 +8,6 @@ from Messaging.twilio_sms import SmsEngine
 # from Financials.financials import Financials
 from sqlalchemy import types
 
-secrets = json.load(open('../config_secrets.json'))
-resources = json.load(open('../Databases/resources_help.json'))
-
 
 class Manager:
     """
@@ -24,17 +21,19 @@ class Manager:
                  db_connection,
                  from_date,
                  to_date,
+                 secrets,
+                 resources,
                  unit_id=None):
 
         self.db_connection = db_connection
         self.from_date = from_date
         self.to_date = to_date
-        self.unit_id = ["7332800", "9289798", "9347180", "9388506"] if not unit_id else unit_id
-
+        self.unit_id = ["EBS32", "HMG28", "GBS124", "GBS125"] if not unit_id else unit_id
+        self.secrets = secrets
+        self.resources = resources
         self.latest_bookings = None
         self.db_bookings = None
-        self.sms_er = SmsEngine(unit_id=self.unit_id)
-        # self.whatsapp_er = Whatsapp()
+        self.sms_er = SmsEngine(unit_id=self.unit_id, secrets=self.secrets)
 
         self.logger = logging.getLogger("booking_logger")
 
@@ -120,34 +119,33 @@ class Manager:
     #                                      "to_date": self.to_date.strftime('%Y-%m-%d'),
     #                                      "unit_id": self.unit_id
     #                                  })
-    #
-    # def prepare_cleaning_plan(self):
-    #     """
-    #     Prepare the cleaning table for the cleaners. Only working from January, when the units are separate.
-    #     Should display all dates between from_date and to_date, and add the corresponding next number of guests.
-    #     :return: An Excel file with a table indicating the apartment, the date and the name and number of guests to clean for.
-    #     """
-    #
-    #     self.get_db_bookings()
-    #     inputs = self.db_bookings[self.db_bookings['status'] != 'Canceled']  # Take out canceled events.
-    #     all_dates_between = list(pd.date_range(start=self.from_date, end=self.to_date))
-    #
-    #     inputs["check_out"] = [adb.strftime("%Y-%m-%d") for adb in inputs["check_out"]]
-    #     all_dates_between = [adb.strftime("%Y-%m-%d") for adb in all_dates_between]
-    #
-    #     out = pd.DataFrame({"check_out": all_dates_between})
-    #
-    #     for uid in self.unit_id:
-    #         coln = resources["display_names"][uid]
-    #         unit_inputs = inputs[inputs['unit_id'] == uid]
-    #         unit_inputs[coln] = unit_inputs.n_guests.shift(-1)
-    #         unit_inputs = unit_inputs[["check_out", coln]]
-    #         out = out.merge(unit_inputs, on='check_out', how='left')
-    #
-    #     out = out.fillna('0')
-    #
-    #     return out
-    #
+
+    def prepare_cleaning_plan(self, bookings):
+        """
+        Prepare the cleaning table for the cleaners. Only working from January, when the units are separate.
+        Should display all dates between from_date and to_date, and add the corresponding next number of guests.
+        :return: An Excel file with a table indicating the apartment, the date and the name and number of guests to clean for.
+        """
+
+        inputs = bookings[bookings['status'] != 'canceled']  # Take out canceled events.
+        inputs["n_guests"] = inputs["adults"] + inputs["children_above_12"] + inputs["children_under_12"]
+        all_dates_between = list(pd.date_range(start=self.from_date, end=self.to_date))
+
+        inputs["check_out_date"] = [adb.strftime("%Y-%m-%d") for adb in inputs["check_out_date"]]
+        all_dates_between = [adb.strftime("%Y-%m-%d") for adb in all_dates_between]
+
+        out = pd.DataFrame({"check_out_date": all_dates_between})
+
+        for uid in self.unit_id:
+            unit_inputs = inputs[inputs['unit_id'] == uid]
+            unit_inputs[uid] = unit_inputs.n_guests.shift(-1)
+            unit_inputs = unit_inputs[["check_out_date", uid]]
+            out = out.merge(unit_inputs, on='check_out_date', how='left')
+
+        out = out.fillna('0')
+
+        return out
+
     # def text_val(self, approved):
     #     self.whatsapp_er.send_whatsapp_message(approved=approved)
     #

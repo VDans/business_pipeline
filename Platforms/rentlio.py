@@ -1,14 +1,15 @@
 import requests
 import json
 import pandas as pd
-
-# secrets = json.load(open('../config_secrets.json'))
-# API_KEY = secrets["rentlio"]["api_key"]
+from datetime import datetime
 
 
 class Rentlio:
-    def __init__(self, api_key):
-        self.api_key = api_key
+    def __init__(self, api_key, resources):
+        self.api_key = "V5wOxl51lOMUe9vanleqNZjdLWcjjiZg"
+        self.resources = resources
+
+        self.bookings = None
 
     def authenticate(self):
         """
@@ -17,19 +18,26 @@ class Rentlio:
         """
         pass
 
-    def get_data(self):
+    def get_clean_bookings(self):
         response = requests.get(url=f"https://api.rentl.io/v1/reservations?apikey={self.api_key}")
-        df = pd.json_normalize(json.loads(response.content)["data"])
+        self.bookings = pd.json_normalize(json.loads(response.content)["data"])
 
-        return df
+        self.map_columns()
+        self.filter_columns()
+        self.prepare_columns()
 
-    def close_date_range(self, platform):
-        """
-        See: https://docs.rentl.io/#unit-types-update-availability-and-rates-for-unit-type-post
-        :param platform: Where to update the availability
-        :return: None
-        """
-        pass
+    def map_columns(self):
+        self.bookings.columns = [self.resources["columns_in"][c] for c in self.bookings.columns]
 
-    def open_date_range(self, platform):
-        pass
+    def filter_columns(self):
+        self.bookings = self.bookings[self.resources["columns_out"].keys()]
+
+    def prepare_columns(self):
+        # status 1 OK, 5 canceled
+        # Add cleaning fee in services
+        # Dates to datetime
+        self.bookings["check_in_date"] = [datetime.fromtimestamp(int(c)) for c in self.bookings["check_in_date"]]
+        self.bookings["check_out_date"] = [datetime.fromtimestamp(int(c)) for c in self.bookings["check_out_date"]]
+        self.bookings["booking_date"] = [datetime.fromtimestamp(int(c)) for c in self.bookings["booking_date"]]
+        self.bookings["status"] = ["canceled" if c == 5 else "ok" for c in self.bookings["status"]]
+        self.bookings["guest_name"] = [n.title() for n in self.bookings["guest_name"]]

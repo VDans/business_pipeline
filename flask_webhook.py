@@ -18,12 +18,15 @@ sms = SmsEngine(secrets=secrets)
 @app.route('/')
 def hello():
     print("Hello World")
+    return "hello world"
 
 
 @app.route('/data', methods=['POST'])
 def receive_data():
     """For now, get a notification and send an SMS with the infos"""
     data = request.json
+
+    print("")
 
     # Event
     try:
@@ -71,5 +74,56 @@ def receive_data():
     return data
 
 
+@app.route('/data_smoobu', methods=['POST'])
+def receive_data_smoobu():
+    """For now, get a notification and send an SMS with the infos"""
+    data = request.json["data"]
+
+    print("")
+
+    # Event
+    try:
+        event_name_display = resources["smoobu_events"][data["type"]]
+    except KeyError:
+        event_name_display = "Not found"
+        logging.info(f"""event "{data["type"]}" unknown""")
+
+    # Unit
+    try:
+        unit_id = resources["rentlio_properties"][str(data["apartment"]["name"])]
+    except KeyError:
+        unit_id = "Not found"
+        logging.info(f"""unit not found""")
+
+    # Name
+    try:
+        guest_name = data["guest-name"].title()
+    except KeyError:
+        guest_name = "Not found"
+        logging.info(f"""Guest Name not found """)
+
+    # Check-In
+    try:
+        check_in = data["arrival"]  # String already
+    except KeyError:
+        check_in = "Not found"
+        logging.info(f"""check-in date not found """)
+
+    # Check-Out
+    try:
+        check_out = data["departure"]
+    except KeyError:
+        check_out = "Not found"
+        logging.info(f"""check-out date not found """)
+
+    sms.new_booking_sms(event=event_name_display,
+                        unit=unit_id,
+                        name=guest_name,
+                        from_date=check_in,
+                        to_date=check_out)
+
+    return data
+
+
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
