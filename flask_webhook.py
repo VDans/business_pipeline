@@ -123,7 +123,3 @@ def receive_data_smoobu():
                         to_date=check_out)
 
     return data
-
-
-if __name__ == '__main__':
-    app.run(debug=True)
