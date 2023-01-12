@@ -12,7 +12,11 @@ API_KEY = "amDUd156qFXFldmk9H5TYNy1rdIEDI6yXXyJOxryKw"
 
 headers = {"accept": "application/json", "API-key": API_KEY}
 
-response = requests.get(url, headers=headers)
+response = requests.get(url,
+                        headers=headers,
+                        params={
+                            "arrivalFrom": "2023-03-01"
+                        })
 print(response.text)
-bookings = pd.json_normalize(json.loads(response.content)["bookings"])
+bookings = pd.json_normalize(json.loads(response.content)["bookings"]).sort_values(["arrival"])
 print("")

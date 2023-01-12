@@ -27,8 +27,8 @@
     "guest-checkedOut-off": "Check-Out Canceled"
   },
   "smoobu_events": {
-    "": "New Booking",
-    "modification of booking": "Modified Booking",
+    "reservation": "New Booking",
+    "modification of booking": "New/Modified Booking",
     "cancellation": "Canceled Booking"
   },
   "rentlio_properties": {
