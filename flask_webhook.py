@@ -30,22 +30,21 @@ def receive_data_smoobu():
     Get the call - classify it - call a dependent function.
     :return:
     """
-    dat = request.json
-    data = dat["data"]
+    data = request.json
 
-    event_type = data["type"]
+    event_type = data["data"]["type"]
     logging.info(f"Event: {event_type}")
-    unit_id = data["apartment"]["name"]
+    unit_id = data["data"]["apartment"]["name"]
     logging.info(f"Unit ID: {unit_id}")
-    guest_name = data["guest-name"].title()
+    guest_name = data["data"]["guest-name"].title()
     logging.info(f"Guest: {guest_name}")
-    check_in = pd.Timestamp(data["arrival"])  # String
+    check_in = pd.Timestamp(data["data"]["arrival"])  # String
     logging.info(f"Check-In: {check_in}")
-    check_out = pd.Timestamp(data["departure"])  # String
+    check_out = pd.Timestamp(data["data"]["departure"])  # String
     logging.info(f"Check-Out: {check_out}")
-    adults = data["adults"]
+    adults = data["data"]["adults"]
     logging.info(f"adults: {adults}")
-    children = data["children"]
+    children = data["data"]["children"]
     logging.info(f"children: {children}")
 
     s = Smoobu(secrets=secrets,
@@ -53,8 +52,8 @@ def receive_data_smoobu():
 
     if event_type in ["reservation", "modification of booking"]:
         logging.info("Finding cleaner...")
-        cleaner_id = resources["apt_cleaners"][data["apartment"]["name"]]["name"]
-        cleaner_phone = resources["apt_cleaners"][data["apartment"]["name"]]["phone_number"]
+        cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
+        cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
         logging.info(f"Cleaner Assigned: {cleaner_id}")
 
         ##############################################
@@ -76,7 +75,7 @@ def receive_data_smoobu():
                                 unit_id=unit_id,
                                 job_date=check_in,
                                 next_guests_n_nights=(check_out - check_in).days,
-                                next_guests_n_guests=data['adults'] + data['children'],
+                                next_guests_n_guests=data["data"]['adults'] + data["data"]['children'],
                                 cleaner_phone_number=cleaner_phone)
                 logging.info(f"Cleaner has been texted successfully")
 
@@ -86,7 +85,7 @@ def receive_data_smoobu():
                                     name=guest_name,
                                     from_date=check_in,
                                     to_date=check_out,
-                                    phone=data["phone"])
+                                    phone=data["data"]["phone"])
 
                 # The relevant cleaning therefore has to be changed.
                 logging.info(f"The cleaning right before check-in has been modified")
@@ -100,7 +99,7 @@ def receive_data_smoobu():
 
         if len(next_booking) == 0:
             # In this case use the max occupancy:
-            logging.info(f"No one is arriving on that check-out day. Assigning max capacity: {resources['apt_max_occupancy'][unit_id]}")
+            logging.info(f"No one is arriving on that check-out day. Assigning max capacity: {resources['apt_max_occupancy'][unit_id]} guests")
             next_guests = resources["apt_max_occupancy"][unit_id]
             next_nights = 3  # Default value
 
@@ -128,7 +127,7 @@ def receive_data_smoobu():
                                 name=guest_name,
                                 from_date=check_in,
                                 to_date=check_out,
-                                phone=data["phone"])
+                                phone=data["data"]["phone"])
 
             # Cleaner has been informed, therefore add the job to the relevant db table:
             cleaner_row = pd.DataFrame([{
@@ -146,8 +145,8 @@ def receive_data_smoobu():
                                index=False)
 
     elif event_type == "cancellation":
-        cleaner_id = resources["apt_cleaners"][data["apartment"]["name"]]["name"]
-        cleaner_phone = resources["apt_cleaners"][data["apartment"]["name"]]["phone_number"]
+        cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
+        cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
 
         # Modify the previous cleaning to maximum occupancy:
         past_booking = s.get_smoobu_bookings(from_date=check_in,
@@ -176,7 +175,7 @@ def receive_data_smoobu():
                                     name=guest_name,
                                     from_date=check_in,
                                     to_date=check_out,
-                                    phone=data["phone"])
+                                    phone=data["data"]["phone"])
 
                 # The relevant cleaning therefore has to be changed.
                 logging.info(f"The cleaning right before check-in has been modified")
@@ -195,7 +194,7 @@ def receive_data_smoobu():
                                 name=guest_name,
                                 from_date=check_in,
                                 to_date=check_out,
-                                phone=data["phone"])
+                                phone=data["data"]["phone"])
 
             # Cleaner has been informed, therefore change the job in the relevant db table:
             sql = "UPDATE cleanings SET status = 'Canceled' WHERE personnel_id = %(pid)s AND unit_id = %(unit)s AND job_date = %(job_date)s"
@@ -205,7 +204,7 @@ def receive_data_smoobu():
     else:
         ValueError("Call Type unknown")
 
-    return dat
+    return data
 
 
 if __name__ == "__main__":
