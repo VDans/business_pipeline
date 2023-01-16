@@ -14,22 +14,44 @@
     "9289798": "Geiselbergstrasse 28/3/124, 1110 Wien",
     "9347180": "Geiselbergstrasse 28/3/125, 1110 Wien"
   },
-  "rentlio_events": {
-    "ota-reservation-received": "New Booking",
-    "reservation-created": "New Booking",
-    "reservation-updated": "Modified Booking",
-    "reservation-canceled": "Canceled Booking",
-    "ota-reservation-modified": "Modified Booking",
-    "ota-reservation-canceled": "Canceled Booking",
-    "guest-checkedIn-on": "Check-In Confirmed",
-    "guest-checkedIn-off": "Check-In Canceled",
-    "guest-checkedOut-on": "Check-Out Confirmed",
-    "guest-checkedOut-off": "Check-Out Canceled"
-  },
   "smoobu_events": {
     "reservation": "New Booking",
     "modification of booking": "New/Modified Booking",
     "cancellation": "Canceled Booking"
+  },
+  "apt_cleaners": {
+    "EBS32": {
+      "name": "Valentin",
+      "id": "Va_Da",
+      "phone_number": "+436601644192"
+    },
+    "HMG28": {
+      "name": "Valentin",
+      "id": "Va_Da",
+      "phone_number": "+436601644192"
+    },
+    "GBS124": {
+      "name": "Valentin",
+      "id": "Va_Da",
+      "phone_number": "+436601644192"
+    },
+    "GBS125": {
+      "name": "Valentin",
+      "id": "Va_Da",
+      "phone_number": "+436601644192"
+    }
+  },
+  "smoobu_properties": {
+    "EBS32": 1537915,
+    "HMG28": 1537828,
+    "GBS124": 1537918,
+    "GBS125": 1537921
+  },
+  "apt_max_occupancy": {
+    "EBS32": 4,
+    "HMG28": 4,
+    "GBS124": 6,
+    "GBS125": 6
   },
   "rentlio_properties": {
     "22636": "EBS32",
@@ -90,7 +112,7 @@
     "check_out_date": "",
     "unit_id": "",
     "total_nights": "",
-    "notes":"",
+    "notes": "",
     "status": "",
     "adults": "",
     "children_above_12": "",
@@ -109,5 +131,17 @@
     "total_price": "",
     "booking_date": "",
     "channel": ""
+  },
+  "rentlio_events": {
+    "ota-reservation-received": "New Booking",
+    "reservation-created": "New Booking",
+    "reservation-updated": "Modified Booking",
+    "reservation-canceled": "Canceled Booking",
+    "ota-reservation-modified": "Modified Booking",
+    "ota-reservation-canceled": "Canceled Booking",
+    "guest-checkedIn-on": "Check-In Confirmed",
+    "guest-checkedIn-off": "Check-In Canceled",
+    "guest-checkedOut-on": "Check-Out Confirmed",
+    "guest-checkedOut-off": "Check-Out Canceled"
   }
 }

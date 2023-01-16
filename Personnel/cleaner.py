@@ -1,58 +1,44 @@
-# import pandas as pd
-# from datetime import datetime
-#
-#
-# class Cleaner:
-#     def __init__(self, cleaner_id):
-#         self.cleaner_id = cleaner_id
-#
-#         self.name = None
-#         self.whatsapp_answers = None
-#         self.availability = None
-#         self.jobs = None
-#
-#         self.load_data()
-#
-#     def load_data(self):
-#         """
-#         Reads the individual cleaner table in DB and assigns to the attributes.
-#         """
-#         df = pd.DataFrame(
-#             {
-#                 "name": "Klaudia",
-#                 "whatsapp_answers": "Yes",
-#                 "availability": datetime(day=15, month=11, year=2022),
-#                 "jobs": datetime(day=15, month=11, year=2021)
-#             }
-#         )
-#
-#         self.name = df["name"]
-#
-#     def is_available(self, checked_date):
-#         return checked_date.isin(self.availability)
-#
-#     def get_availability(self):
-#         """
-#         Read from DB...
-#         """
-#         self.availability = []
-#
-#     def get_all_jobs(self):
-#         """
-#         Read from DB...
-#         """
-#         self.jobs = 'All Jobs'
-#
-#     def get_all_whatsapp_answers(self):
-#         """
-#         Read from DB...
-#         """
-#         self.whatsapp_answers = 'All Whatsapp Messages'
-#
-#     @staticmethod
-#     def get_total_paid_amount(self):
-#         """
-#         Read from DB...
-#         """
-#         out = 'Sum of the total paid amounts for this cleaner id'
-#         return out
+import logging
+import pandas as pd
+
+
+class Personnel:
+    def __init__(self, db_handler):
+        self.db_handler = db_handler
+
+    def add_personnel(self, first_name, family_name, phone_number, role, ssn):
+        """
+        Add a row in the personnel table in the DB.
+        """
+        cleaner_id = first_name[:2] + "_" + family_name[:2]
+        cleaner_row = pd.DataFrame([{
+            "personnel_id": cleaner_id,
+            "first_name": first_name,
+            "family_name": family_name,
+            "phone_number": phone_number,
+            "role": role,
+            "ssn": ssn
+        }])
+        cleaner_row.to_sql(name="personnel",
+                           con=self.db_handler,
+                           if_exists="append",
+                           index=False)
+        logging.info(f"New cleaner {first_name} added to the database.")
+
+    def get_cleaner_schedule(self, cleaner_id):
+        """
+        Recover the schedule of a staff member.
+        cleanings is the table with all schedules.
+        """
+        cleanings = pd.read_sql(sql=f"""SELECT * FROM cleanings WHERE personnel_id = {cleaner_id}""",
+                                con=self.db_handler,
+                                index_col=None)
+
+        return cleanings
+
+    def get_cleaner_info(self, cleaner_id):
+        cleaner = pd.read_sql(sql=f"""SELECT * FROM personnel WHERE personnel_id = {cleaner_id}""",
+                              con=self.db_handler,
+                              index_col=None)
+
+        return cleaner
