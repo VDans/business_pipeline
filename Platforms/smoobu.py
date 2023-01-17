@@ -1,5 +1,6 @@
 import requests
 import json
+import logging
 import pandas as pd
 
 
@@ -10,13 +11,18 @@ class Smoobu:
         self.url = "https://login.smoobu.com/api"
 
         self.headers = {"accept": "application/json", "API-key": self.secrets["smoobu"]["api_key"]}
+        self.smoobu_logger = logging.getLogger(__name__)
 
-    def get_smoobu_bookings(self, from_date, to_date, unit_id, filter_by="arrival"):
+    def get_webhook_infos(self, payload):
+        self.smoobu_logger.info(payload)
+
+    def get_smoobu_bookings(self, from_date: pd.Timestamp, to_date: pd.Timestamp, unit_id: str, filter_by="check-in"):
         """
         Attention! Not including a from and to_date might result in incomplete results!
         :return: Table with Smoobu reservations
         """
-        unit_id: int = self.resources["smoobu_properties"][unit_id]
+        self.smoobu_logger.info(f"""Getting bookings in {unit_id} for a {filter_by} from {from_date.strftime("%Y-%m-%d")} to {to_date.strftime("%Y-%m-%d")}""")
+        smoobu_unit_id: int = self.resources["smoobu_properties"][unit_id]
         route = "/reservations"
         parameters = None
 
@@ -24,13 +30,13 @@ class Smoobu:
             parameters = {
                 "arrivalFrom": from_date.strftime("%Y-%m-%d"),
                 "arrivalTo": to_date.strftime("%Y-%m-%d"),
-                "apartmentId": unit_id
+                "apartmentId": smoobu_unit_id
             }
         elif filter_by == "check-out":
             parameters = {
                 "departureFrom": from_date.strftime("%Y-%m-%d"),
                 "departureTo": to_date.strftime("%Y-%m-%d"),
-                "apartmentId": unit_id
+                "apartmentId": smoobu_unit_id
             }
         else:
             ValueError("filter not recognized. Choose from 'check-in' and 'check-out'.")
@@ -44,15 +50,3 @@ class Smoobu:
             out = out.sort_values(["arrival"])
 
         return out
-
-    def update_booking(self, booking_id, **updates):
-        route = f"/reservations/{booking_id}"
-
-        parameters = {
-            "adults": updates["adults"],
-            "children": updates["children"]
-        }
-        resp = requests.post(url=self.url + route,
-                             headers=self.headers,
-                             params=parameters)
-        return resp
