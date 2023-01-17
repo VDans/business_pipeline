@@ -4,18 +4,20 @@ from flask import Flask, request, json
 from sqlalchemy import create_engine
 
 from Messaging.twilio_sms import SmsEngine
+from Messaging.twilio_whatsapp import Whatsapp
 from Platforms.smoobu import Smoobu
 
 logging.basicConfig(level=logging.INFO)
 
 resources = json.load(open('Databases/resources_help.json'))
-secrets = json.load(open('/etc/config_secrets.json'))
+secrets = json.load(open('config_secrets.json'))
 
 db_engine = create_engine(url=secrets['database']['url'])
 
 app = Flask(__name__)
 
 sms = SmsEngine(secrets=secrets)
+w = Whatsapp(secrets=secrets, resources=resources)
 
 
 @app.route('/')
@@ -32,18 +34,26 @@ def receive_data_smoobu():
     """
     data = request.json
 
-    event_type = data["data"]["type"]
+    verify_signature()
+
+    event_type = data["data"]["type"]  # FixMe: This is not the correct key to use and leads only to modifications!
     logging.info(f"Event: {event_type}")
+
     unit_id = data["data"]["apartment"]["name"]
     logging.info(f"Unit ID: {unit_id}")
+
     guest_name = data["data"]["guest-name"].title()
     logging.info(f"Guest: {guest_name}")
+
     check_in = pd.Timestamp(data["data"]["arrival"])  # String
     logging.info(f"Check-In: {check_in}")
+
     check_out = pd.Timestamp(data["data"]["departure"])  # String
     logging.info(f"Check-Out: {check_out}")
+
     adults = data["data"]["adults"]
     logging.info(f"adults: {adults}")
+
     children = data["data"]["children"]
     logging.info(f"children: {children}")
 
@@ -208,6 +218,18 @@ def receive_data_smoobu():
         ValueError("Call Type unknown")
 
     return data
+
+
+def verify_signature():
+    """
+    ADD REQUEST SIGNATURE VERIFICATION!
+    try:
+        twil_sig = request.headers['X-Twilio-Signature']
+        print(f"X-Twilio-Signature: {twil_sig}")
+    except KeyError:
+        return ('No X-Twilio-Signature. This request likely did not originate from Twilio.', 418)
+    """
+    pass
 
 
 if __name__ == "__main__":

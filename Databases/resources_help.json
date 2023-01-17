@@ -1,23 +1,30 @@
 {
-  "display_names": {
-    "7332800": "EBS32",
-    "9289798": "GBS124",
-    "9347180": "GBS125",
-    "9388506": "HMG28",
-    "Premium Sunny Flat in Central Vienna": "7332800",
-    "Central Modern Flat with Balcony": "9289798",
-    "Bright Modern Flat with Balcony": "9347180",
-    "Premium Flat in Central Vienna": "9388506"
-  },
-  "Addresses": {
-    "7332800": "Erdbergstrasse 118/32, 1030 Wien",
-    "9289798": "Geiselbergstrasse 28/3/124, 1110 Wien",
-    "9347180": "Geiselbergstrasse 28/3/125, 1110 Wien"
+  "addresses": {
+    "EBS32": "Erdbergstrasse 118/32, 1030 Wien",
+    "GBS124": "Geiselbergstrasse 28/3/124, 1110 Wien",
+    "GBS125": "Geiselbergstrasse 28/3/125, 1110 Wien",
+    "HMG28": "Hagenmüllergasse 28/14, 1030 Wien"
   },
   "smoobu_events": {
     "reservation": "New Booking",
-    "modification of booking": "New/Modified Booking",
+    "modification of booking": "Modified Booking",
     "cancellation": "Canceled Booking"
+  },
+  "smoobu_properties": {
+    "EBS32": 1537915,
+    "HMG28": 1537828,
+    "GBS124": 1537918,
+    "GBS125": 1537921
+  },
+  "twilio": {
+    "whatsapp_sender": "whatsapp:+436703085269",
+    "sms_sender": "+436703085269"
+  },
+  "apt_max_occupancy": {
+    "EBS32": 4,
+    "HMG28": 4,
+    "GBS124": 6,
+    "GBS125": 6
   },
   "apt_cleaners": {
     "EBS32": {
@@ -40,108 +47,5 @@
       "id": "Va_Da",
       "phone_number": "+436601644192"
     }
-  },
-  "smoobu_properties": {
-    "EBS32": 1537915,
-    "HMG28": 1537828,
-    "GBS124": 1537918,
-    "GBS125": 1537921
-  },
-  "apt_max_occupancy": {
-    "EBS32": 4,
-    "HMG28": 4,
-    "GBS124": 6,
-    "GBS125": 6
-  },
-  "rentlio_properties": {
-    "22636": "EBS32",
-    "22637": "HMG28",
-    "22638": "GBS124",
-    "22639": "GBS125"
-  },
-  "columns_in": {
-    "id": "rentlio_id",
-    "unitsId": "rentlio_unit_id",
-    "propertiesId": "rentlio_property_id",
-    "arrivalDate": "check_in_date",
-    "departureDate": "check_out_date",
-    "unitName": "unit_id",
-    "totalNights": "total_nights",
-    "note": "notes",
-    "status": "status",
-    "checkedIn": "checkedIn",
-    "checkedOut": "checkedOut",
-    "rateNames": "rateNames",
-    "origin": "origin",
-    "adults": "adults",
-    "childrenAbove12": "children_above_12",
-    "childrenUnder12": "children_under_12",
-    "channelId": "channel_booking_id",
-    "guestId": "rentlio_guest_id",
-    "guestName": "guest_name",
-    "guestEmail": "guest_email",
-    "guestContactNumber": "guest_phone_number",
-    "guestCountryName": "guest_country",
-    "pricePerNight": "average_night_price",
-    "totalPrice": "total_price_before_services",
-    "accommodationCost": "total_price2",
-    "totalCost": "total_price3",
-    "discountPercentage": "discount_pct",
-    "discountNominal": "discount",
-    "currencyId": "currency",
-    "depositNominal": "deposit",
-    "tentativeValidUntil": "tentativeValidUntil",
-    "channelCommissionNominal": "channel_commission",
-    "channelCommissionPercentage": "channel_commission_pct",
-    "totalServicesPrice": "total_services_price",
-    "totalReservationPrice": "total_price",
-    "vatRate": "vat_pct",
-    "vatAmount": "vat",
-    "vatIncluded": "vat_included",
-    "bookedAt": "booking_date",
-    "createdAt": "creation_date",
-    "salesChannelName": "rentlio_channel_name",
-    "otaChannelName": "channel",
-    "canceledAt": "cancellation_date",
-    "modifiedAt": "modification_date",
-    "checkedInAt": "checked_in_date",
-    "checkedOutAt": "checked_out_date"
-  },
-  "columns_out": {
-    "check_in_date": "",
-    "check_out_date": "",
-    "unit_id": "",
-    "total_nights": "",
-    "notes": "",
-    "status": "",
-    "adults": "",
-    "children_above_12": "",
-    "children_under_12": "",
-    "channel_booking_id": "",
-    "guest_name": "",
-    "guest_email": "",
-    "guest_phone_number": "",
-    "guest_country": "",
-    "average_night_price": "",
-    "total_price_before_services": "",
-    "discount": "",
-    "currency": "",
-    "channel_commission": "",
-    "total_services_price": "",
-    "total_price": "",
-    "booking_date": "",
-    "channel": ""
-  },
-  "rentlio_events": {
-    "ota-reservation-received": "New Booking",
-    "reservation-created": "New Booking",
-    "reservation-updated": "Modified Booking",
-    "reservation-canceled": "Canceled Booking",
-    "ota-reservation-modified": "Modified Booking",
-    "ota-reservation-canceled": "Canceled Booking",
-    "guest-checkedIn-on": "Check-In Confirmed",
-    "guest-checkedIn-off": "Check-In Canceled",
-    "guest-checkedOut-on": "Check-Out Confirmed",
-    "guest-checkedOut-off": "Check-Out Canceled"
   }
 }
