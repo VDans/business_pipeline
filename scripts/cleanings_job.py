@@ -38,7 +38,7 @@ def check_new_cleanings(unit_id, sms_engine, api_connector):
 
     missing_cleanings = [c for c in checkouts if c not in cleanings]
 
-    if len(missing_cleanings) == 0:
+    if len(missing_cleanings) > 0:
         for m in missing_cleanings:
             # Each one missing should be added to the DB + texted to the relevant staff.
             # 1. Find the checkout cleaning info:

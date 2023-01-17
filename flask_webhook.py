@@ -113,6 +113,7 @@ def receive_data_smoobu():
 
         # If the booking arrival is within 14 days, warn the staff.
         if (check_out <= (pd.Timestamp.now() + pd.Timedelta(days=14))) & (check_out >= pd.Timestamp.now()):
+            logging.info(f"The check-out is within 14 days.")
             sms.cleaner_sms(event=event_type,
                             unit_id=unit_id,
                             job_date=check_out,
@@ -143,6 +144,8 @@ def receive_data_smoobu():
                                con=db_engine,
                                if_exists="append",
                                index=False)
+        else:
+            logging.info(f"The check-out is NOT within 14 days. Nothing will be sent and the API calls will take over.")
 
     elif event_type == "cancellation":
         cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
