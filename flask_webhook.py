@@ -1,8 +1,6 @@
-import time
-
 import pandas as pd
 import logging
-from flask import Flask, request, json
+from flask import Flask, request, json, render_template
 from sqlalchemy import create_engine
 
 from Messaging.twilio_sms import SmsEngine
@@ -13,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 resources = json.load(open('Databases/resources_help.json'))
 secrets = json.load(open('/etc/config_secrets.json'))
+# secrets = json.load(open('config_secrets.json'))
 
 db_engine = create_engine(url=secrets['database']['url'])
 
@@ -26,6 +25,14 @@ w = Whatsapp(secrets=secrets, resources=resources)
 def hello():
     print("Host-It Webhook")
     return "Host-It Webhook"
+
+
+@app.route('/whatsapp_replies', methods=['POST'])
+def receive_whatsapp():
+    data = request.values
+    # For now, we don't go too far. I just want to see if I received a message through there. I don't need to be able to answer.
+    w.send_whatsapp_message(target_phone="+436601644192", body=f"""From {data["From"]}\n{data["Body"]}""")
+    return "Forwarding successful!"
 
 
 @app.route('/data_smoobu', methods=['POST'])
@@ -103,7 +110,7 @@ def receive_data_smoobu():
             w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
             update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-    return data
+    return "Event processed successfully!"
 
 
 def verify_signature():
