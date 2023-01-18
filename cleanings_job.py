@@ -6,10 +6,10 @@ import logging
 import pandas as pd
 from sqlalchemy import create_engine
 from Platforms.smoobu import Smoobu
-from Messaging.twilio_sms import SmsEngine
+from Messaging.twilio_whatsapp import Whatsapp
 
-# secrets = json.load(open('/etc/config_secrets.json'))
-secrets = json.load(open('config_secrets.json'))
+secrets = json.load(open('/etc/config_secrets.json'))
+# secrets = json.load(open('config_secrets.json'))
 
 resources = json.load(open('Databases/resources_help.json'))
 
@@ -19,7 +19,7 @@ db_engine = create_engine(url=secrets['database']['url'])
 UNITS = ["EBS32", "HMG28", "GBS124", "GBS125"]
 
 
-def check_new_cleanings(unit_id, sms_engine, api_connector):
+def check_new_cleanings(unit_id, whatsapp_engine, api_connector):
     """
     For each apartment - cleaner:
 
@@ -30,14 +30,13 @@ def check_new_cleanings(unit_id, sms_engine, api_connector):
     bookings = api_connector.get_smoobu_bookings(from_date=pd.Timestamp.now(),
                                                  to_date=pd.Timestamp.now() + pd.Timedelta(days=14),
                                                  unit_id=unit_id)
-    checkouts = pd.to_datetime(bookings["departure"])
+    checkouts = list(pd.to_datetime(bookings["departure"]))
 
     # Cleanings
-    cleanings = pd.read_sql(sql=f"""SELECT * FROM cleanings WHERE unit_id = {unit_id}""",
+    cleanings = pd.read_sql(sql=f"""SELECT * FROM cleanings WHERE unit_id = '{unit_id}' AND status <> 'Canceled'""",
                             con=db_engine,
                             index_col=None)
-    cleanings = pd.to_datetime(cleanings["job_date"])
-
+    cleanings = list(pd.to_datetime(cleanings["job_date"]))
     missing_cleanings = [c for c in checkouts if c not in cleanings]
 
     if len(missing_cleanings) > 0:
@@ -47,10 +46,11 @@ def check_new_cleanings(unit_id, sms_engine, api_connector):
             new_cleaning = bookings[bookings["departure"] == m.strftime("%Y-%m-%d")]
 
             # Check if someone checks-in after the new guest. If yes, text this data. If not, text the max occupancy.
-            next_booking = api_connector.get_smoobu_bookings(from_date=new_cleaning["departure"],
-                                                             to_date=new_cleaning["departure"],
+            next_booking = api_connector.get_smoobu_bookings(from_date=pd.Timestamp(new_cleaning["departure"].iloc[0]),
+                                                             to_date=pd.Timestamp(new_cleaning["departure"].iloc[0]),
                                                              unit_id=unit_id,
                                                              filter_by="check-in")
+
             if len(next_booking) == 0:
                 # In this case use the max occupancy:
                 logging.info(f"No one is arriving on that check-out day. Assigning max capacity: {resources['apt_max_occupancy'][unit_id]}")
@@ -58,29 +58,40 @@ def check_new_cleanings(unit_id, sms_engine, api_connector):
                 next_nights = 3  # Default value
             else:
                 # Record the info of the next guests
-                next_check_out = pd.Timestamp(next_booking["departure"][0])
-                next_check_in = pd.Timestamp(next_booking["arrival"][0])
+                next_check_out = pd.Timestamp(next_booking["departure"].iloc[0])
+                next_check_in = pd.Timestamp(next_booking["arrival"].iloc[0])
                 next_nights = (next_check_out - next_check_in).days
-                next_guests = int(next_booking['adults'][0]) + int(next_booking['children'][0])
+                next_guests = int(next_booking['adults'].iloc[0]) + int(next_booking['children'].iloc[0])
                 logging.info(f"The next booking has {next_guests} guests and stay {next_nights} nights")
 
             cleaner_phone: str = resources["apt_cleaners"][unit_id]["phone_number"]
-            sms_engine.cleaner_sms(event="reservation",
-                                   unit_id=unit_id,
-                                   job_date=m,
-                                   cleaner_phone_number=cleaner_phone,
-                                   next_guests_n_nights=next_nights,
-                                   next_guests_n_guests=next_guests)
+            cleaner_id: str = resources["apt_cleaners"][unit_id]["name"]
+            whatsapp_engine.message_cleaner(event="new", unit_id=unit_id, job_date=m, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
+            cleaner_row = pd.DataFrame([{
+                "personnel_id": cleaner_id,
+                "job_date": m,
+                "guests": next_guests,
+                "received_on": pd.Timestamp.now(),
+                "unit_id": unit_id,
+                "job_type": "cleaning",
+                "status": "booked",
+                "paid": False
+            }])
+            cleaner_row.to_sql(name="cleanings",
+                               con=db_engine,
+                               if_exists="append",
+                               index=False)
+
     else:
-        logging.info(f"No new cleaning detected for {unit_id} within 14 days.")
+        logging.info(f"No unknown new cleaning detected for {unit_id} within 14 days.")
 
 
 def main():
-    sms = SmsEngine(secrets=secrets)
+    w = Whatsapp(secrets=secrets, resources=resources)
     smoo = Smoobu(secrets=secrets, resources=resources)
 
     for u in UNITS:
-        check_new_cleanings(unit_id=u, sms_engine=sms, api_connector=smoo)
+        check_new_cleanings(unit_id=u, whatsapp_engine=w, api_connector=smoo)
 
 
 if __name__ == '__main__':
