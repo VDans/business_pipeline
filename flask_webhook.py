@@ -12,7 +12,7 @@ from Platforms.smoobu import Smoobu
 logging.basicConfig(level=logging.INFO)
 
 resources = json.load(open('Databases/resources_help.json'))
-secrets = json.load(open('config_secrets.json'))
+secrets = json.load(open('/etc/config_secrets.json'))
 
 db_engine = create_engine(url=secrets['database']['url'])
 
