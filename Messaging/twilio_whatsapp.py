@@ -11,10 +11,11 @@ class Whatsapp:
 
         self.client = Client(self.account_sid, self.auth_token)
 
-    def send_whatsapp_message(self, body, target_phone):
+    def send_whatsapp_message(self, body, target_phone, media_url=None):
         m_template = self.client.messages.create(
             from_=self.resources["twilio"]["whatsapp_sender"],
             to=f"whatsapp:{target_phone}",
+            media_url=[media_url],
             body=body)
         return m_template
 
