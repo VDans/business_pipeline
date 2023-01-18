@@ -35,7 +35,7 @@ def send_random_love_message(whatsapp_engine):
     hearts_drawing = random.randint(1, 5)
     body = n_repeat * ejis[hearts_drawing]
 
-    whatsapp_engine.send_whatsapp_message(target_phone="+436601644192", body=body, media_url=image_url)
+    whatsapp_engine.send_whatsapp_message(target_phone="+436643964372", body=body, media_url=image_url)
 
 
 def main():
