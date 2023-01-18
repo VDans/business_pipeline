@@ -9,9 +9,13 @@ from Platforms.smoobu import Smoobu
 
 logging.basicConfig(level=logging.INFO)
 
-resources = json.load(open('Databases/resources_help.json'))
-secrets = json.load(open('/etc/config_secrets.json'))
-# secrets = json.load(open('config_secrets.json'))
+
+try:
+    secrets = json.load(open('/etc/config_secrets.json'))
+    resources = json.load(open('../Databases/resources_help.json'))
+except FileNotFoundError:
+    secrets = json.load(open('config_secrets.json'))
+    resources = json.load(open('Databases/resources_help.json'))
 
 db_engine = create_engine(url=secrets['database']['url'])
 

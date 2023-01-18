@@ -8,10 +8,12 @@ from sqlalchemy import create_engine
 from Platforms.smoobu import Smoobu
 from Messaging.twilio_whatsapp import Whatsapp
 
-secrets = json.load(open('/etc/config_secrets.json'))
-# secrets = json.load(open('config_secrets.json'))
-
-resources = json.load(open('Databases/resources_help.json'))
+try:
+    secrets = json.load(open('/etc/config_secrets.json'))
+    resources = json.load(open('../Databases/resources_help.json'))
+except FileNotFoundError:
+    secrets = json.load(open('config_secrets.json'))
+    resources = json.load(open('Databases/resources_help.json'))
 
 logging.basicConfig(level=logging.INFO)
 db_engine = create_engine(url=secrets['database']['url'])
