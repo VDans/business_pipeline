@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 
 try:
     secrets = json.load(open('/etc/config_secrets.json'))
-    resources = json.load(open('business_pipeline/Databases/resources_help.json'))
+    resources = json.load(open('Databases/resources_help.json'))
 except FileNotFoundError:
     secrets = json.load(open('config_secrets.json'))
     resources = json.load(open('Databases/resources_help.json'))
