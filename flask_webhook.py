@@ -55,66 +55,70 @@ def receive_data_smoobu():
 
     verify_signature()
 
-    event_type = data["action"]
-    unit_id = data["data"]["apartment"]["name"]
-    guest_name = data["data"]["guest-name"].title()
-    check_in = pd.Timestamp(data["data"]["arrival"])  # String
-    check_out = pd.Timestamp(data["data"]["departure"])  # String
-    adults = data["data"]["adults"]
-    children = data["data"]["children"]
-    n_nights = (check_out - check_in).days
-    phone = data["data"]["phone"]
+    try:
+        event_type = data["action"]
+        unit_id = data["data"]["apartment"]["name"]
+        guest_name = data["data"]["guest-name"].title()
+        check_in = pd.Timestamp(data["data"]["arrival"])  # String
+        check_out = pd.Timestamp(data["data"]["departure"])  # String
+        adults = data["data"]["adults"]
+        children = data["data"]["children"]
+        n_nights = (check_out - check_in).days
+        phone = data["data"]["phone"]
 
-    logging.info(f"Event: {event_type}")
-    logging.info(f"Unit ID: {unit_id}")
-    logging.info(f"Guest: {guest_name}")
-    logging.info(f"Check-In: {check_in}")
-    logging.info(f"Check-Out: {check_out}")
-    logging.info(f"adults: {adults}")
-    logging.info(f"children: {children}")
-    logging.info(f"Phone Number: {phone}")
+        logging.info(f"Event: {event_type}")
+        logging.info(f"Unit ID: {unit_id}")
+        logging.info(f"Guest: {guest_name}")
+        logging.info(f"Check-In: {check_in}")
+        logging.info(f"Check-Out: {check_out}")
+        logging.info(f"adults: {adults}")
+        logging.info(f"children: {children}")
+        logging.info(f"Phone Number: {phone}")
 
-    # Assign cleaner:
-    cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
-    cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
-    logging.info(f"Cleaner Assigned: {cleaner_id}")
+        # Assign cleaner:
+        cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
+        cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
+        logging.info(f"Cleaner Assigned: {cleaner_id}")
 
-    if event_type == 'newReservation':
-        w.message_owner(event="New Booking", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
-        if within_n_days(n=14, date=check_in):
-            bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
-            if len(bookings):
-                w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=adults + children, next_guests_n_nights=n_nights)
-                update_cleanings_db(con=db_engine, action="change_guests", n_guests=adults + children, cleaner_id=cleaner_id, job_date=check_in, unit_id=unit_id)
+        if event_type == 'newReservation':
+            w.message_owner(event="New Booking", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+            if within_n_days(n=14, date=check_in):
+                bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
+                if len(bookings):
+                    w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=adults + children, next_guests_n_nights=n_nights)
+                    update_cleanings_db(con=db_engine, action="change_guests", n_guests=adults + children, cleaner_id=cleaner_id, job_date=check_in, unit_id=unit_id)
 
-        if within_n_days(n=14, date=check_out):
-            bookings = s.get_smoobu_bookings(from_date=check_out, to_date=check_out, unit_id=unit_id, filter_by="check-in")
-            if len(bookings):
-                next_check_out = pd.Timestamp(bookings["departure"][0])
-                next_check_in = pd.Timestamp(bookings["arrival"][0])
-                next_nights = (next_check_out - next_check_in).days
-                next_guests = int(bookings['adults'][0]) + int(bookings['children'][0])
-                w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
-                update_cleanings_db(con=db_engine, action="add", n_guests=next_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
-            else:
-                max_guests = resources["apt_max_occupancy"][unit_id]
-                max_nights = 3
-                w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
-                update_cleanings_db(con=db_engine, action="add", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+            if within_n_days(n=14, date=check_out):
+                bookings = s.get_smoobu_bookings(from_date=check_out, to_date=check_out, unit_id=unit_id, filter_by="check-in")
+                if len(bookings):
+                    next_check_out = pd.Timestamp(bookings["departure"][0])
+                    next_check_in = pd.Timestamp(bookings["arrival"][0])
+                    next_nights = (next_check_out - next_check_in).days
+                    next_guests = int(bookings['adults'][0]) + int(bookings['children'][0])
+                    w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
+                    update_cleanings_db(con=db_engine, action="add", n_guests=next_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+                else:
+                    max_guests = resources["apt_max_occupancy"][unit_id]
+                    max_nights = 3
+                    w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
+                    update_cleanings_db(con=db_engine, action="add", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-    elif event_type == 'cancelReservation':
-        w.message_owner(event="Cancellation", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
-        if within_n_days(n=14, date=check_in):
-            bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
-            if len(bookings):
-                max_guests = resources["apt_max_occupancy"][unit_id]
-                max_nights = 3
-                w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
-                update_cleanings_db(con=db_engine, action="change_guests", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+        elif event_type == 'cancelReservation':
+            w.message_owner(event="Cancellation", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+            if within_n_days(n=14, date=check_in):
+                bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
+                if len(bookings):
+                    max_guests = resources["apt_max_occupancy"][unit_id]
+                    max_nights = 3
+                    w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
+                    update_cleanings_db(con=db_engine, action="change_guests", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-        if within_n_days(n=14, date=check_out):
-            w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
-            update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+            if within_n_days(n=14, date=check_out):
+                w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
+                update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+
+    except KeyError:
+        logging.warning("One or more characteristic wasn't found in the call. Discarding")
 
     return "Event processed successfully!"
 
