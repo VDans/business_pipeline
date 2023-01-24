@@ -9,7 +9,6 @@ from Platforms.smoobu import Smoobu
 
 logging.basicConfig(filename='error.log', level=logging.INFO)
 
-
 try:
     secrets = json.load(open('/etc/config_secrets.json'))
     resources = json.load(open('Databases/resources_help.json'))
@@ -57,29 +56,63 @@ def receive_data_smoobu():
 
     try:
         event_type = data["action"]
+    except KeyError:
+        logging.warning("Event not found. Discarding call.")
+        event_type = "Unknown"
+
+    try:
         unit_id = data["data"]["apartment"]["name"]
+    except KeyError:
+        logging.warning("Unit ID not found.")
+        unit_id = "Unknown"
+
+    try:
         guest_name = data["data"]["guest-name"].title()
+    except KeyError:
+        logging.warning("Guest Name not found.")
+        guest_name = "Unknown"
+
+    try:
         check_in = pd.Timestamp(data["data"]["arrival"])  # String
         check_out = pd.Timestamp(data["data"]["departure"])  # String
+        n_nights = (check_out - check_in).days
+
+    except KeyError:
+        logging.warning("Dates data not found.")
+        check_in = check_out = "Unknown"
+        n_nights = -1
+
+    try:
         adults = data["data"]["adults"]
         children = data["data"]["children"]
-        n_nights = (check_out - check_in).days
+    except KeyError:
+        logging.warning("Number if people not found.")
+        adults = children = 0
+
+    try:
         phone = data["data"]["phone"]
+    except KeyError:
+        logging.warning("Phone not found.")
+        phone = "Unknown"
 
-        logging.info(f"Event: {event_type}")
-        logging.info(f"Unit ID: {unit_id}")
-        logging.info(f"Guest: {guest_name}")
-        logging.info(f"Check-In: {check_in}")
-        logging.info(f"Check-Out: {check_out}")
-        logging.info(f"adults: {adults}")
-        logging.info(f"children: {children}")
-        logging.info(f"Phone Number: {phone}")
+    logging.info(f"Event: {event_type}")
+    logging.info(f"Unit ID: {unit_id}")
+    logging.info(f"Guest: {guest_name}")
+    logging.info(f"Check-In: {check_in}")
+    logging.info(f"Check-Out: {check_out}")
+    logging.info(f"adults: {adults}")
+    logging.info(f"children: {children}")
+    logging.info(f"Phone Number: {phone}")
 
-        # Assign cleaner:
+    # Assign cleaner:
+    try:
         cleaner_id = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["name"]
         cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
         logging.info(f"Cleaner Assigned: {cleaner_id}")
+    except KeyError:
+        logging.info("Cleaner could not be found")
 
+    try:
         if event_type == 'newReservation':
             w.message_owner(event="New Booking", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
             if within_n_days(n=14, date=check_in):
@@ -117,10 +150,10 @@ def receive_data_smoobu():
                 w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
                 update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-    except KeyError:
-        logging.warning("One or more characteristic wasn't found in the call. Discarding")
+    except:
+        logging.info("Logic could not be applied.")
 
-    return "Event processed successfully!"
+    return "Event processed."
 
 
 def verify_signature():
