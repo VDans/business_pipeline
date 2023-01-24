@@ -31,7 +31,10 @@ def hello():
 
 @app.route('/whatsapp_replies', methods=['POST'])
 def receive_whatsapp():
-    logging.info("\n\n\nWHATSAPP REPLY BOT\n\n\n")
+    """
+    Here you can code automatic replies: If they press a parking button -> Send parking infos, etc.
+    """
+    logging.info("\n\n\nWHATSAPP REPLY BOT")
     data = request.values
     # For now, we don't go too far. I just want to see if I received a message through there. I don't need to be able to answer.
     w.send_whatsapp_message(target_phone="+436601644192", body=f"""From {data["From"]}\n{data["Body"]}""")
@@ -42,10 +45,10 @@ def receive_whatsapp():
 def receive_data_smoobu():
     """
     Get the call - classify it - call a dependent function.
-    :return:
+    ATTENTION! Smoobu sends 2 calls: One info one, and an updateRate call with the rate infos!
     """
 
-    logging.info("\n\n\nNEW SMOOBU CALL\n\n\n")
+    logging.info("\n\n\nNEW SMOOBU CALL")
     data = request.json
 
     logging.info(data)
@@ -89,7 +92,7 @@ def receive_data_smoobu():
         children = data["data"]["children"]
     except KeyError:
         logging.warning("Number if people not found.")
-        adults = children = 0
+        adults = children = -1
 
     try:
         phone = data["data"]["phone"]
@@ -112,48 +115,56 @@ def receive_data_smoobu():
         cleaner_phone = resources["apt_cleaners"][data["data"]["apartment"]["name"]]["phone_number"]
         logging.info(f"Cleaner Assigned: {cleaner_id}")
     except KeyError:
+        cleaner_id = cleaner_phone = "Unknown"
         logging.info("Cleaner could not be found")
 
-    try:
-        if event_type == 'newReservation':
-            w.message_owner(event="New Booking", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
-            if within_n_days(n=14, date=check_in):
-                bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
-                if len(bookings):
-                    w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=adults + children, next_guests_n_nights=n_nights)
-                    update_cleanings_db(con=db_engine, action="change_guests", n_guests=adults + children, cleaner_id=cleaner_id, job_date=check_in, unit_id=unit_id)
+    if event_type == 'newReservation':
+        w.message_owner(event="New Booking", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+        if within_n_days(n=14, date=check_in):
+            bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
+            if len(bookings):
+                w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=adults + children, next_guests_n_nights=n_nights)
+                update_cleanings_db(con=db_engine, action="change_guests", n_guests=adults + children, cleaner_id=cleaner_id, job_date=check_in, unit_id=unit_id)
 
-            if within_n_days(n=14, date=check_out):
-                bookings = s.get_smoobu_bookings(from_date=check_out, to_date=check_out, unit_id=unit_id, filter_by="check-in")
-                if len(bookings):
-                    next_check_out = pd.Timestamp(bookings["departure"][0])
-                    next_check_in = pd.Timestamp(bookings["arrival"][0])
-                    next_nights = (next_check_out - next_check_in).days
-                    next_guests = int(bookings['adults'][0]) + int(bookings['children'][0])
-                    w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
-                    update_cleanings_db(con=db_engine, action="add", n_guests=next_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
-                else:
-                    max_guests = resources["apt_max_occupancy"][unit_id]
-                    max_nights = 3
-                    w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
-                    update_cleanings_db(con=db_engine, action="add", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+        if within_n_days(n=14, date=check_out):
+            bookings = s.get_smoobu_bookings(from_date=check_out, to_date=check_out, unit_id=unit_id, filter_by="check-in")
+            if len(bookings):
+                next_check_out = pd.Timestamp(bookings["departure"][0])
+                next_check_in = pd.Timestamp(bookings["arrival"][0])
+                next_nights = (next_check_out - next_check_in).days
+                next_guests = int(bookings['adults'][0]) + int(bookings['children'][0])
+                w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
+                update_cleanings_db(con=db_engine, action="add", n_guests=next_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+            else:
+                max_guests = resources["apt_max_occupancy"][unit_id]
+                max_nights = 3
+                w.message_cleaner(event="new", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
+                update_cleanings_db(con=db_engine, action="add", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-        elif event_type == 'cancelReservation':
-            w.message_owner(event="Cancellation", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
-            if within_n_days(n=14, date=check_in):
-                bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
-                if len(bookings):
-                    max_guests = resources["apt_max_occupancy"][unit_id]
-                    max_nights = 3
-                    w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
-                    update_cleanings_db(con=db_engine, action="change_guests", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+    elif event_type == 'cancelReservation':
+        # ATTENTION! When a cancellation comes through, Smoobu sends a second call with event = updateRates! TO BE HANDLED!
+        w.message_owner(event="Cancellation", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+        if within_n_days(n=14, date=check_in):
+            bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
+            if len(bookings):
+                max_guests = resources["apt_max_occupancy"][unit_id]
+                max_nights = 3
+                w.message_cleaner(event="change", unit_id=unit_id, job_date=check_in, cleaner_phone_number=cleaner_phone, next_guests_n_guests=max_guests, next_guests_n_nights=max_nights)
+                update_cleanings_db(con=db_engine, action="change_guests", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-            if within_n_days(n=14, date=check_out):
-                w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
-                update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
+        if within_n_days(n=14, date=check_out):
+            w.message_cleaner(event="cancel", unit_id=unit_id, job_date=check_out, cleaner_phone_number=cleaner_phone)
+            update_cleanings_db(con=db_engine, action="cancel", cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
-    except:
-        logging.info("Logic could not be applied.")
+    elif event_type == 'updateReservation':
+        w.message_owner(event="Modification", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+
+    elif event_type == 'updateRates':
+        logging.info("Webhook for updating rates. Sending the new price opened.")
+        w.message_owner(event="", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+
+    else:
+        logging.info("Event not recognized.")
 
     return "Event processed."
 

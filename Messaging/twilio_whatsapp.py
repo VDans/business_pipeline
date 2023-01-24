@@ -44,8 +44,12 @@ class Whatsapp:
 
         return m_template
 
-    def message_owner(self, event, unit_id, name, from_date, to_date, phone):
-        body = f"{event}: {name}\nFlat: {unit_id}\nCheck-In: {from_date.strftime('%Y-%m-%d')} \nCheck-Out: {to_date.strftime('%Y-%m-%d')} \nPhone: {phone}"
+    def message_owner(self, event, unit_id, name, from_date, to_date, phone, price=None):
+        if event == "updateRates":
+            body = f"{event}: The cancelled booking dates were re-opened at price {price}"
+        else:
+            body = f"{event}: {name}\nFlat: {unit_id}\nCheck-In: {from_date.strftime('%Y-%m-%d')} \nCheck-Out: {to_date.strftime('%Y-%m-%d')} \nPhone: {phone}"
+
         m_template = self.client.messages.create(
             from_=self.resources["twilio"]["whatsapp_sender"],
             to="whatsapp:+436601644192",
