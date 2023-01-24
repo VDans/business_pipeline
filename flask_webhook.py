@@ -26,12 +26,12 @@ w = Whatsapp(secrets=secrets, resources=resources)
 
 @app.route('/')
 def hello():
-    print("Host-It Webhook")
     return "Host-It Webhook"
 
 
 @app.route('/whatsapp_replies', methods=['POST'])
 def receive_whatsapp():
+    logging.info("\n\n\nWHATSAPP REPLY BOT\n\n\n")
     data = request.values
     # For now, we don't go too far. I just want to see if I received a message through there. I don't need to be able to answer.
     w.send_whatsapp_message(target_phone="+436601644192", body=f"""From {data["From"]}\n{data["Body"]}""")
@@ -45,7 +45,7 @@ def receive_data_smoobu():
     :return:
     """
 
-    logging.info("\n\n\nNEW WEBHOOK CALL\n\n\n")
+    logging.info("\n\n\nNEW SMOOBU CALL\n\n\n")
     data = request.json
 
     # Load the API:
