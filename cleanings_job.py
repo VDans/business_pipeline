@@ -87,6 +87,9 @@ def check_new_cleanings(unit_id, whatsapp_engine, api_connector):
     else:
         logging.info(f"No unknown new cleaning detected for {unit_id} within 14 days.")
 
+    logging.info("Job has run. Texting owner.")
+    whatsapp_engine.message_owner(event="routine_update")
+
 
 def main():
     w = Whatsapp(secrets=secrets, resources=resources)
