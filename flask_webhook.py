@@ -48,6 +48,8 @@ def receive_data_smoobu():
     logging.info("\n\n\nNEW SMOOBU CALL\n\n\n")
     data = request.json
 
+    logging.info(data)
+
     # Load the API:
     s = Smoobu(secrets=secrets,
                resources=resources)
