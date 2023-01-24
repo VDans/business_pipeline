@@ -46,7 +46,7 @@ class Whatsapp:
 
     def message_owner(self, event, unit_id=None, name=None, from_date=None, to_date=None, phone=None, price=None):
         if event == "updateRates":
-            body = f"{event}: The cancelled booking dates were re-opened at price {price}"
+            body = f"{event}: The booking dates were at price {price}"
         elif event == "routine_update":
             body = f"{event}: Cron Job ran today with success."
         else:
