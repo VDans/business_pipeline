@@ -7,7 +7,7 @@ from Messaging.twilio_sms import SmsEngine
 from Messaging.twilio_whatsapp import Whatsapp
 from Platforms.smoobu import Smoobu
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename='error.log', level=logging.INFO)
 
 
 try:
@@ -45,6 +45,8 @@ def receive_data_smoobu():
     Get the call - classify it - call a dependent function.
     :return:
     """
+
+    logging.info("\n\n\nNEW WEBHOOK CALL\n\n\n")
     data = request.json
 
     # Load the API:
