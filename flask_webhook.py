@@ -142,7 +142,6 @@ def receive_data_smoobu():
                 update_cleanings_db(con=db_engine, action="add", n_guests=max_guests, cleaner_id=cleaner_id, job_date=check_out, unit_id=unit_id)
 
     elif event_type == 'cancelReservation':
-        # ATTENTION! When a cancellation comes through, Smoobu sends a second call with event = updateRates! TO BE HANDLED!
         w.message_owner(event="Cancellation", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
         if within_n_days(n=14, date=check_in):
             bookings = s.get_smoobu_bookings(from_date=check_in, to_date=check_in, unit_id=unit_id, filter_by="check-out")
@@ -161,7 +160,7 @@ def receive_data_smoobu():
 
     elif event_type == 'updateRates':
         logging.info("Webhook for updating rates. Sending the new price opened.")
-        w.message_owner(event="", unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
+        w.message_owner(event=event_type, unit_id=unit_id, name=guest_name, from_date=check_in, to_date=check_out, phone=phone)
 
     else:
         logging.info("Event not recognized.")

@@ -7,6 +7,7 @@ from Messaging.twilio_sms import SmsEngine
 # from Messaging.twilio_whatsapp import Whatsapp
 # from Financials.financials import Financials
 from sqlalchemy import types
+from Platforms.smoobu import Smoobu
 
 
 class Manager:
@@ -124,26 +125,33 @@ class Manager:
         """
         Prepare the cleaning table for the cleaners. Only working from January, when the units are separate.
         Should display all dates between from_date and to_date, and add the corresponding next number of guests.
-        :return: An Excel file with a table indicating the apartment, the date and the name and number of guests to clean for.
+
+        Right now formatted for Smoobu!
+        :return: A table with a table indicating the apartment, the date and the name and number of guests to clean for.
         """
 
-        inputs = bookings[bookings['status'] != 'canceled']  # Take out canceled events.
-        inputs["n_guests"] = inputs["adults"] + inputs["children_above_12"] + inputs["children_under_12"]
+        # inputs = bookings[bookings['status'] != 'canceled']  # Take out canceled events.
+        bookings["n_guests"]: int = bookings["adults"] + bookings["children"]
         all_dates_between = list(pd.date_range(start=self.from_date, end=self.to_date))
-
-        inputs["check_out_date"] = [adb.strftime("%Y-%m-%d") for adb in inputs["check_out_date"]]
         all_dates_between = [adb.strftime("%Y-%m-%d") for adb in all_dates_between]
 
-        out = pd.DataFrame({"check_out_date": all_dates_between})
+        out = pd.DataFrame({"departure": all_dates_between})
 
-        for uid in self.unit_id:
-            unit_inputs = inputs[inputs['unit_id'] == uid]
+        for uid in [self.unit_id]:
+            unit_inputs = bookings[bookings['apartment.name'] == uid]
             unit_inputs[uid] = unit_inputs.n_guests.shift(-1)
-            unit_inputs = unit_inputs[["check_out_date", uid]]
-            out = out.merge(unit_inputs, on='check_out_date', how='left')
+            unit_inputs = unit_inputs[["departure", uid]]
+            out = out.merge(unit_inputs, on='departure', how='left')
+            out = out.fillna('0')
+            out[uid] = out[uid].astype(int)
 
-        out = out.fillna('0')
+        return out
 
+    def get_latest_bookings(self):
+        s = Smoobu(secrets=self.secrets, resources=self.resources)
+        out = s.get_smoobu_bookings(from_date=self.from_date,
+                                    to_date=self.to_date,
+                                    unit_id=self.unit_id)
         return out
 
     # def text_val(self, approved):
