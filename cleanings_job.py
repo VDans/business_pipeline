@@ -69,6 +69,7 @@ def check_new_cleanings(unit_id, whatsapp_engine, api_connector):
             cleaner_phone: str = resources["apt_cleaners"][unit_id]["phone_number"]
             cleaner_id: str = resources["apt_cleaners"][unit_id]["name"]
             whatsapp_engine.message_cleaner(event="new", unit_id=unit_id, job_date=m, cleaner_phone_number=cleaner_phone, next_guests_n_guests=next_guests, next_guests_n_nights=next_nights)
+            whatsapp_engine.message_owner(event="cleaning_confirmation", unit_id=unit_id, cleaner_id=cleaner_id, from_date=m)
             cleaner_row = pd.DataFrame([{
                 "personnel_id": cleaner_id,
                 "job_date": m,

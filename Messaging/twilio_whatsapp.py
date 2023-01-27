@@ -44,11 +44,13 @@ class Whatsapp:
 
         return m_template
 
-    def message_owner(self, event, unit_id=None, name=None, from_date=None, to_date=None, phone=None, price=None):
+    def message_owner(self, event, unit_id=None, name=None, from_date=None, to_date=None, phone=None, price=None, cleaner_id=None):
         if event == "updateRates":
             body = f"{event}: The booking dates were at price {price}"
         elif event == "routine_update":
             body = f"{event}: Cron Job ran today with success."
+        elif event == "cleaning_confirmation":
+            body = f"{event}: Cleaner {cleaner_id} received message for {unit_id} on the {from_date.strftime('%Y-%m-%d')}."
         else:
             body = f"{event}: {name}\nFlat: {unit_id}\nCheck-In: {from_date.strftime('%Y-%m-%d')} \nCheck-Out: {to_date.strftime('%Y-%m-%d')} \nPhone: {phone}"
 
