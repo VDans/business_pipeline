@@ -50,3 +50,19 @@ class Smoobu:
             out = out.sort_values(["arrival"])
 
         return out
+
+
+from sqlalchemy import create_engine
+
+secrets = json.load(open('../config_secrets.json'))
+resources = json.load(open('../Databases/resources_help.json'))
+
+logging.basicConfig(level=logging.INFO)
+db_engine = create_engine(url=secrets['database']['url'])
+
+s = Smoobu(secrets, resources)
+out = s.get_smoobu_bookings(from_date=pd.Timestamp(day=1, month=1, year=2022),
+                            to_date=pd.Timestamp(day=1, month=3, year=2023),
+                            unit_id="GBS124")
+
+print("")

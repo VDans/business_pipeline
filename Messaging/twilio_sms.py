@@ -3,16 +3,26 @@ from twilio.rest import Client
 
 
 class SmsEngine:
-    def __init__(self, secrets, unit_id: str = None):
+    def __init__(self, secrets, resources, unit_id: str = None):
         """
 
         :param topic: Can be "financials", "confirmation", "check_in", "check_out"
         """
         self.account_sid = secrets['twilio']['account_sid']
         self.auth_token = secrets['twilio']['auth_token']
+        self.resources = resources
 
         self.client = Client(self.account_sid, self.auth_token)
         self.unit_id = unit_id
+
+    def send_parking_booking(self, plate: str, time="15"):
+        message = self.client.messages.create(
+            body=f"{time}*{plate}",
+            from_=self.resources["twilio"]["sms_sender"],
+            # to="+436601644192"
+            to='+436646606000'
+        )
+        return message
 
     def send_message(self, topic: str, **kwargs):
 

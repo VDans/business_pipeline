@@ -24,9 +24,6 @@ sms = SmsEngine(secrets=secrets)
 w = Whatsapp(secrets=secrets, resources=resources)
 
 
-# https://dff3-2a02-8388-28c0-7200-a44f-2aac-c5d3-5840.eu.ngrok.io
-# http://165.232.66.222/data_smoobu
-
 @app.route('/')
 def hello():
     return "Host-It Webhook"

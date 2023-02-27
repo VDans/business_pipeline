@@ -6,7 +6,7 @@ secrets = json.load(open('../config_secrets.json'))
 resources = json.load(open('../Databases/resources_help.json'))
 
 account = "1672745038.7538"
-url = f"https://capi.tokeet.com/v1/bookings/98930f7d-e3ff-4ab7-a261-de89eda60357?account={account}&booked=1"
+url = f"https://capi.tokeet.com/v1/guest?account={account}"
 payload = {}
 files = {}
 headers = {

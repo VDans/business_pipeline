@@ -56,7 +56,7 @@ def concierge(api_connector, unit_id):
     It checks if a guest arrives within 7 days.
     It checks the messages sent to that guest.
 
-    !!! Owner has a "blacklist" of guests where automation was deactivated. Check this list before sending message.
+    !!! Owner has to have a "blacklist" of guests where automation was deactivated. Check this list before sending message.
     """
     # Upcoming bookings in the next 7 days:
     bookings = api_connector.get_smoobu_bookings(from_date=pd.Timestamp.now(),
@@ -66,11 +66,13 @@ def concierge(api_connector, unit_id):
     # The ones with status = "confirmed" need to be sent the check-in instructions.
     # The ones with status = "check-in" need to be sent the entry code if the unit has Nuki.
     # The ones with status = "ok" are ready to come and don't need anything except the chatbot.
+    print("")
 
 
 def main():
     w = Whatsapp(secrets=secrets, resources=resources)
     smoo = Smoobu(secrets=secrets, resources=resources)
+    concierge(api_connector=smoo, unit_id="GBS124")
 
 
 if __name__ == '__main__':

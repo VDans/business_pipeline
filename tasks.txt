@@ -19,3 +19,13 @@ TODOs:
 
 ### REPORTING ###
 - Make the database data exportable to Excel.
+
+### PARKING ###
+- Send a text message to the city for booking a parking of 15 minutes.
+- Ticket is valid for 15 minutes.
+- A period of 2 minutes needs to be respected before booking again.
+- Repeat until the expiration time is reached.
+
+1. Flask app receives Whatsapp Message containing: * Plate Number + Time of expiration *
+2. Flask app sends text message to the city with the parameters * "15" + Plate Number *
+3. Flask app receives text conformation from city and confirms to user via Whatsapp.
