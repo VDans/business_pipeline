@@ -64,15 +64,5 @@ def whatsapp_parking():
     return "Forwarding successful!"
 
 
-@app.route('/sms_redirect', methods=['POST'])
-def sms_redirect():
-    """
-    Receive SMS on Twilio and redirect to personal Whatsapp.
-    """
-    data = request.values
-    w.send_whatsapp_message(target_phone="+436601644192", body=f"""New SMS from {data["From"]}:\n{data["Body"]}""")
-    return "Forwarding successful!"
-
-
 if __name__ == "__main__":
     app.run()
