@@ -2,3 +2,12 @@
 1. Receive webhook post call
 2. Identify if reservation booked/changed/cancelled.
 3. Send API POST call with the dates from (1.) to both platforms, to close/change/open the dates.
+
+### PRICING ###
+1. Write prices in Pricing Google Sheet     - DONE
+2. Call Google API to pull prices           - ONGOING
+    2.1. Authentication Issues
+    2.2. Dates
+    2.3.
+3. Check prices (25 < Price < 1000?)        - TODO
+4. Push prices to Zodomus                   - TODO

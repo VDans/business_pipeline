@@ -3,19 +3,16 @@ from twilio.rest import Client
 
 
 class Whatsapp:
-    def __init__(self, secrets, resources):
+    def __init__(self, secrets):
         self.secrets = secrets
-        self.resources = resources
-        self.account_sid = self.secrets['twilio']['account_sid']
-        self.auth_token = self.secrets['twilio']['auth_token']
 
-        self.client = Client(self.account_sid, self.auth_token)
+        self.client = Client(self.secrets['twilio']['account_sid'], self.secrets['twilio']['auth_token'])
 
     def send_whatsapp_message(self, body, target_phone, media_url=None):
         m_template = self.client.messages.create(
-            from_=self.resources["twilio"]["whatsapp_sender"],
+            from_=self.secrets["twilio"]["whatsapp_sender"],
             to=f"whatsapp:{target_phone}",
-            media_url=[media_url],
+            # media_url=[media_url],
             body=body)
         return m_template
 
@@ -38,7 +35,7 @@ class Whatsapp:
             ValueError("Event unknown")
 
         m_template = self.client.messages.create(
-            from_=self.resources["twilio"]["whatsapp_sender"],
+            from_=self.secrets["twilio"]["whatsapp_sender"],
             to=f"whatsapp:{cleaner_phone_number}",
             body=body)
 
@@ -55,7 +52,7 @@ class Whatsapp:
             body = f"{event}: {name}\nFlat: {unit_id}\nCheck-In: {from_date.strftime('%Y-%m-%d')} \nCheck-Out: {to_date.strftime('%Y-%m-%d')} \nPhone: {phone}"
 
         m_template = self.client.messages.create(
-            from_=self.resources["twilio"]["whatsapp_sender"],
+            from_=self.secrets["twilio"]["whatsapp_sender"],
             to="whatsapp:+436601644192",
             body=body)
 

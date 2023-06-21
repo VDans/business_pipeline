@@ -2,16 +2,28 @@ import logging
 import pandas as pd
 import requests
 import json
+from requests.auth import HTTPBasicAuth
 
 
 class Zodomus:
-	def __init__(self, url="https://api.zodomus.com"):
+	def __init__(self, secrets, url="https://api.zodomus.com"):
+		self.secrets = secrets
 		self.url = url
 		self.logger = logging.getLogger()
 		self.headers = {
-			'Content-Type': 'application/json',
-			'Authorization': 'Basic bEVlNnNhUUkvR1A4RnZjRlIwTjNwejVEdG9YTlJCMEhJT3NldlFLcXduUT06VkVXY2FUMzY5ZW41ZEFyMUhrTEZvTFE2bGQvYVJ1NXF2aXRZdVZtRnVNdz0='
+			'Content-Type': 'application/json'
 		}
+		self.auth = HTTPBasicAuth(self.secrets["zodomus_prd"]["api_user"], self.secrets["zodomus_prd"]["api_password"])
+
+	def custom_api_call(self, method, call_url, payload):
+		"""Use when in need of additional custom API empty calls on the Zodomus server"""
+		self.logger.info(f"Sending empty payload to {method} {call_url}")
+		response = requests.request(auth=self.auth,
+		                            method=method,
+		                            url=f"{self.url}{call_url}",
+		                            headers=self.headers,
+		                            data=payload)
+		return response
 
 	def set_availability(self, unit_id_z: str, date_from: pd.Timestamp, date_to: pd.Timestamp, availability: int):
 		"""Change the number of available units of a property on both Airbnb and Booking.com"""
@@ -32,16 +44,18 @@ class Zodomus:
 			"availability": availability
 		})
 		self.logger.info(f"Sending payload {airbnb_payload} to POST /availability")
-		response0 = requests.request(method="POST",
+		response0 = requests.request(auth=self.auth,
+		                             method="POST",
 		                             url=f"{self.url}/availability",
 		                             headers=self.headers,
 		                             data=airbnb_payload)
 		self.logger.info(f"Sending payload {booking_payload} to POST /availability")
-		response1 = requests.request(method="POST",
+		response1 = requests.request(auth=self.auth,
+		                             method="POST",
 		                             url=f"{self.url}/availability",
 		                             headers=self.headers,
 		                             data=booking_payload)
-		return response0, response1
+		return response1
 
 	def check_availability(self, unit_id_z: str, channel_id: str, date_from: pd.Timestamp, date_to: pd.Timestamp):
 		"""Check the availability for a given unit and dates."""
@@ -52,7 +66,8 @@ class Zodomus:
 			"dateTo": date_to.strftime("%Y-%m-%d")
 		})
 		self.logger.info(f"Sending payload {payload} to GET /availability")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/availability",
 		                            headers=self.headers,
 		                            data=payload)
@@ -61,7 +76,8 @@ class Zodomus:
 	def get_channels(self):
 		"""Get available channels"""
 		self.logger.info(f"Sending empty payload to GET /channels")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/channels",
 		                            headers=self.headers)
 
@@ -75,7 +91,8 @@ class Zodomus:
 			"priceModelId": price_model
 		})
 		self.logger.info(f"Sending payload {payload} to POST /property-activation")
-		response = requests.request(method="POST",
+		response = requests.request(auth=self.auth,
+		                            method="POST",
 		                            url=f"{self.url}/property-activation",
 		                            headers=self.headers,
 		                            data=payload)
@@ -89,7 +106,8 @@ class Zodomus:
 			"propertyId": unit_id_z
 		})
 		self.logger.info(f"Sending payload {payload} to POST /property-check")
-		response = requests.request(method="POST",
+		response = requests.request(auth=self.auth,
+		                            method="POST",
 		                            url=f"{self.url}/property-check",
 		                            headers=self.headers,
 		                            data=payload)
@@ -114,7 +132,8 @@ class Zodomus:
 			]
 		})
 		self.logger.info(f"Sending payload {payload} to POST /rooms-activation")
-		response = requests.request(method="POST",
+		response = requests.request(auth=self.auth,
+		                            method="POST",
 		                            url=f"{self.url}/rooms-activation",
 		                            headers=self.headers,
 		                            data=payload)
@@ -128,7 +147,8 @@ class Zodomus:
 			"propertyId": unit_id_z
 		})
 		self.logger.info(f"Sending payload {payload} to GET /room-rates")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/room-rates",
 		                            headers=self.headers,
 		                            data=payload)
@@ -150,7 +170,8 @@ class Zodomus:
 			}
 		})
 		self.logger.info(f"Sending payload {payload} to POST /rates")
-		response = requests.request(method="POST",
+		response = requests.request(auth=self.auth,
+		                            method="POST",
 		                            url=f"{self.url}/rates",
 		                            headers=self.headers,
 		                            data=payload)
@@ -164,7 +185,8 @@ class Zodomus:
 			"propertyId": unit_id_z
 		})
 		self.logger.info(f"Sending payload {payload} to GET /reservations-summary")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/reservations-summary",
 		                            headers=self.headers,
 		                            data=payload)
@@ -178,7 +200,8 @@ class Zodomus:
 			"propertyId": unit_id_z
 		})
 		self.logger.info(f"Sending payload {payload} to GET /reservations-queue")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/reservations-queue",
 		                            headers=self.headers,
 		                            data=payload)
@@ -193,7 +216,8 @@ class Zodomus:
 			"reservationId": reservation_number
 		})
 		self.logger.info(f"Sending payload {payload} to GET /reservations")
-		response = requests.request(method="GET",
+		response = requests.request(auth=self.auth,
+		                            method="GET",
 		                            url=f"{self.url}/reservations",
 		                            headers=self.headers,
 		                            data=payload)
