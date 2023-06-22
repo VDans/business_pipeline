@@ -1,13 +1,40 @@
-### CHANNEL MANAGER ###
-1. Receive webhook post call
-2. Identify if reservation booked/changed/cancelled.
-3. Send API POST call with the dates from (1.) to both platforms, to close/change/open the dates.
-
 ### PRICING ###
 1. Write prices in Pricing Google Sheet     - DONE
-2. Call Google API to pull prices           - ONGOING
-    2.1. Authentication Issues
-    2.2. Dates
-    2.3.
-3. Check prices (25 < Price < 1000?)        - TODO
-4. Push prices to Zodomus                   - TODO
+2. Detect changed cells in Google Sheet     -
+3. Call Google API to pull prices           -
+    3.1. Authenticate without trouble       -
+    3.2. Identify flat and date changed     -
+4. Check prices (25 < Price < 1000?)        -
+5. Push specific prices to Zodomus          -
+
+### DATABASE ###
+Tables:
+- bookings
+
+NEW BOOKING comes in
+1. Webhook call comes in.
+2. Extract reservationId from webhook.
+3. GET /reservations with reservationId.
+4. Upload reservation data to DB.
+5. POST /availability with arrivalDate and departureDate.
+6. Logging of everything.
+
+MODIFIED BOOKING comes in:
+1. Webhook call comes in.
+2. Extract reservationId from webhook.
+3. GET /reservations with reservationId for NEW reservation data.
+4. Update old reservation status on DB to "modified"
+5. Upload new reservation data from Zodomus to DB.
+6. POST /availability with OLD arrivalDate and OLD departureDate to 1.
+7. POST /availability with NEW arrivalDate and NEW departureDate to 0.
+8. Logging of everything.
+
+CANCELLED BOOKING comes in:
+1. Webhook call comes in.
+2. Extract reservationId from webhook.
+3. Update reservation status on DB to "cancelled"
+4. POST /availability with arrivalDate and departureDate to 1.
+5. Logging of everything.
+
+
++ Create daily routine API call: GET /reservations-summary and compare to DB.

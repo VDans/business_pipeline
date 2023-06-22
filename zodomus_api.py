@@ -1,4 +1,6 @@
 import logging
+import time
+
 import pandas as pd
 import requests
 import json
@@ -11,9 +13,10 @@ class Zodomus:
 		self.url = url
 		self.logger = logging.getLogger()
 		self.headers = {
+			# "Authorization": "Bearer " + self.secrets["zodomus_dev"][""],
 			'Content-Type': 'application/json'
 		}
-		self.auth = HTTPBasicAuth(self.secrets["zodomus_prd"]["api_user"], self.secrets["zodomus_prd"]["api_password"])
+		self.auth = HTTPBasicAuth(self.secrets["zodomus_dev"]["api_user"], self.secrets["zodomus_dev"]["api_password"])
 
 	def custom_api_call(self, method, call_url, payload):
 		"""Use when in need of additional custom API empty calls on the Zodomus server"""
@@ -25,37 +28,23 @@ class Zodomus:
 		                            data=payload)
 		return response
 
-	def set_availability(self, unit_id_z: str, date_from: pd.Timestamp, date_to: pd.Timestamp, availability: int):
+	def set_availability(self, channel_id: str, unit_id_z: str, room_id_z: str, date_from: pd.Timestamp, date_to: pd.Timestamp, availability: int):
 		"""Change the number of available units of a property on both Airbnb and Booking.com"""
-		booking_payload = json.dumps({
-			"channelId": "1",
+		payload = json.dumps({
+			"channelId": channel_id,
 			"propertyId": unit_id_z,
-			"roomId": f"{unit_id_z}01",
+			"roomId": room_id_z,
 			"dateFrom": date_from.strftime("%Y-%m-%d"),
 			"dateTo": date_to.strftime("%Y-%m-%d"),
 			"availability": availability
 		})
-		airbnb_payload = json.dumps({
-			"channelId": "3",
-			"propertyId": unit_id_z,
-			"roomId": f"{unit_id_z}01",
-			"dateFrom": date_from.strftime("%Y-%m-%d"),
-			"dateTo": date_to.strftime("%Y-%m-%d"),
-			"availability": availability
-		})
-		self.logger.info(f"Sending payload {airbnb_payload} to POST /availability")
-		response0 = requests.request(auth=self.auth,
-		                             method="POST",
-		                             url=f"{self.url}/availability",
-		                             headers=self.headers,
-		                             data=airbnb_payload)
-		self.logger.info(f"Sending payload {booking_payload} to POST /availability")
-		response1 = requests.request(auth=self.auth,
-		                             method="POST",
-		                             url=f"{self.url}/availability",
-		                             headers=self.headers,
-		                             data=booking_payload)
-		return response1
+		self.logger.info(f"Sending payload {payload} to POST /availability")
+		response = requests.request(auth=self.auth,
+		                            method="POST",
+		                            url=f"{self.url}/availability",
+		                            headers=self.headers,
+		                            data=payload)
+		return response
 
 	def check_availability(self, unit_id_z: str, channel_id: str, date_from: pd.Timestamp, date_to: pd.Timestamp):
 		"""Check the availability for a given unit and dates."""
@@ -155,8 +144,12 @@ class Zodomus:
 
 		return response
 
-	def set_rate(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, date_to: pd.Timestamp, price: float, currency: str = "EUR"):
-		"""Set a night price"""
+	def set_rate(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, price: float, currency: str = "EUR"):
+		"""
+		Set a night price
+		If the delta between dates is >1, then the same price will be applied to the range of dates. If you need different prices, use "set_rate_range()"
+		"""
+		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. For more, use the function "set_rate_range".
 		payload = json.dumps({
 			"channelId": channel_id,
 			"propertyId": unit_id_z,
@@ -177,6 +170,42 @@ class Zodomus:
 		                            data=payload)
 
 		return response
+
+	def set_minimum_nights(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, min_nights: int, currency: str = "EUR"):
+		"""
+		Set a minimum length of stay for a given date.
+		"""
+		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. For more, use the function "set_rate_range".
+		payload = json.dumps({
+			"channelId": channel_id,
+			"propertyId": unit_id_z,
+			"roomId": room_id_z,
+			"dateFrom": date_from.strftime("%Y-%m-%d"),
+			"dateTo": date_to.strftime("%Y-%m-%d"),
+			"currencyCode": currency,
+			"rateId": rate_id_z,
+			"minimumStay": min_nights
+		})
+		self.logger.info(f"Sending payload {payload} to POST /rates")
+		response = requests.request(auth=self.auth,
+		                            method="POST",
+		                            url=f"{self.url}/rates",
+		                            headers=self.headers,
+		                            data=payload)
+
+		return response
+
+	def set_rate_range(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_price_min_nights: pd.DataFrame, currency: str = "EUR"):
+		"""
+		"set_rate()" for uploading different prices.
+		Airbnb should not get too many calls at the same time, therefore includes a sleep function.
+		"""
+		for row in date_price_min_nights:
+			time.sleep(0.1)
+			d = row["date"]
+			p = row["price"]
+			m_n = row["min_nights"]
+			self.set_rate(channel_id, unit_id_z, room_id_z, rate_id_z, d, p, m_n, currency)
 
 	def get_reservations_summary(self, channel_id, unit_id_z):
 		"""Overview of reservations"""
