@@ -1,12 +1,3 @@
-### PRICING ###
-1. Write prices in Pricing Google Sheet     - DONE
-2. Detect changed cells in Google Sheet     -
-3. Call Google API to pull prices           -
-    3.1. Authenticate without trouble       -
-    3.2. Identify flat and date changed     -
-4. Check prices (25 < Price < 1000?)        -
-5. Push specific prices to Zodomus          -
-
 ### DATABASE ###
 Tables:
 - bookings
@@ -37,4 +28,19 @@ CANCELLED BOOKING comes in:
 5. Logging of everything.
 
 
-+ Create daily routine API call: GET /reservations-summary and compare to DB.
++ Create daily routine API call: GET /reservations-summary and compare to DB:
+* Run daily checks
+	- On prices
+	- On min nights
+	- On bookings
+
+### ADDING A FLAT ###
+1. Add the flat to Zodomus
+2. Accept on Booking.com and Airbnb
+3. Get the flat propertyId, roomId, rateId from Zodomus
+4. Write the credentials to the config_secrets file under "booking_flat_columns", "flat_names", "airbnb", "booking.com"
+5. Add the flat the Google Sheet columns
+Should be good!
+
+### TESTING ###
+Make sure the dev or prd in zodomus_api is on both creds.

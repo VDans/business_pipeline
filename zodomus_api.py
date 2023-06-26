@@ -16,7 +16,7 @@ class Zodomus:
 			# "Authorization": "Bearer " + self.secrets["zodomus_dev"][""],
 			'Content-Type': 'application/json'
 		}
-		self.auth = HTTPBasicAuth(self.secrets["zodomus_dev"]["api_user"], self.secrets["zodomus_dev"]["api_password"])
+		self.auth = HTTPBasicAuth(self.secrets["zodomus_prd"]["api_user"], self.secrets["zodomus_prd"]["api_password"])
 
 	def custom_api_call(self, method, call_url, payload):
 		"""Use when in need of additional custom API empty calls on the Zodomus server"""
@@ -147,9 +147,9 @@ class Zodomus:
 	def set_rate(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, price: float, currency: str = "EUR"):
 		"""
 		Set a night price
-		If the delta between dates is >1, then the same price will be applied to the range of dates. If you need different prices, use "set_rate_range()"
+		If the delta between dates is >1, then the same price will be applied to the range of dates."
 		"""
-		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. For more, use the function "set_rate_range".
+		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. .
 		payload = json.dumps({
 			"channelId": channel_id,
 			"propertyId": unit_id_z,
