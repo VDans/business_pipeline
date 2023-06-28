@@ -43,6 +43,79 @@ class Google:
 
         return sheet_range
 
+    def write_note(self, sheet_name: str, cell_range: str, note: str):
+        """Add a note to a cells range"""
+        response = self.service_sheet.spreadsheets().values().batchUpdate(
+            spreadsheetId=self.sheet_id,
+            valueInputOption="USER_ENTERED",
+            range=cell_range,
+            body={
+                "requests": [
+                    {
+                        "updateCells": {
+                            "range": {
+                                "sheetId": sheet_name,
+                                "startRowIndex": 1,
+                                "endRowIndex": 1,
+                                "startColumnIndex": 1,
+                                "endColumnIndex": 1
+                            },
+                            "rows": [
+                                {
+                                    "values": [
+                                        {
+                                            "note": "my note"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "fields": "note"
+                        }
+                    }
+                ]
+            }
+        ).execute()
+
+        return response
+
+    def merge_cells(self, sheet_name: str, cell_range: str):
+        """Merge a cells range"""
+        response = self.service_sheet.spreadsheets().values().batchUpdate(
+            spreadsheetId=self.sheet_id,
+            valueInputOption="USER_ENTERED",
+            range=cell_range,
+            body={
+                "requests": [
+                    {
+                        "mergeCells": {
+                            "range": {
+                                "sheetId": sheet_name,
+                                "startRowIndex": 0,
+                                "endRowIndex": 2,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 2
+                            },
+                            "mergeType": "MERGE_ALL"
+                        }
+                    },
+                    {
+                        "mergeCells": {
+                            "range": {
+                                "sheetId": sheet_name,
+                                "startRowIndex": 2,
+                                "endRowIndex": 6,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 2
+                            },
+                            "mergeType": "MERGE_COLUMNS"
+                        }
+                    }
+                ]
+            }
+        ).execute()
+
+        return response
+
     @staticmethod
     def excel_date(date1):
         """Transform a date into an Excel Integer"""

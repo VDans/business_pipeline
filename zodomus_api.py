@@ -149,7 +149,7 @@ class Zodomus:
 		Set a night price
 		If the delta between dates is >1, then the same price will be applied to the range of dates."
 		"""
-		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. .
+		date_to = date_from + pd.Timedelta(days=1) if channel_id != '3' else date_from  # The function should be used for only one day at the time. .
 		payload = json.dumps({
 			"channelId": channel_id,
 			"propertyId": unit_id_z,
@@ -171,11 +171,39 @@ class Zodomus:
 
 		return response
 
+	def set_airbnb_rate(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, price: float, min_nights: int, currency: str = "EUR"):
+		"""
+		Set a night price
+		If the delta between dates is >1, then the same price will be applied to the range of dates."
+		"""
+		date_to = date_from + pd.Timedelta(days=1) if channel_id != '3' else date_from  # The function should be used for only one day at the time. .
+		payload = json.dumps({
+			"channelId": channel_id,
+			"propertyId": unit_id_z,
+			"roomId": room_id_z,
+			"dateFrom": date_from.strftime("%Y-%m-%d"),
+			"dateTo": date_to.strftime("%Y-%m-%d"),
+			"currencyCode": currency,
+			"rateId": rate_id_z,
+			"prices": {
+				"price": price
+			},
+			"minimumStay": min_nights
+		})
+		self.logger.info(f"Sending HEAVY payload {payload} to POST /rates")
+		response = requests.request(auth=self.auth,
+		                            method="POST",
+		                            url=f"{self.url}/rates",
+		                            headers=self.headers,
+		                            data=payload)
+
+		return response
+
 	def set_minimum_nights(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, min_nights: int, currency: str = "EUR"):
 		"""
 		Set a minimum length of stay for a given date.
 		"""
-		date_to = date_from + pd.Timedelta(days=1)  # The function should be used for only one day at the time. For more, use the function "set_rate_range".
+		date_to = date_from + pd.Timedelta(days=1) if channel_id != '3' else date_from  # The function should be used for only one day at the time. .
 		payload = json.dumps({
 			"channelId": channel_id,
 			"propertyId": unit_id_z,
@@ -205,7 +233,7 @@ class Zodomus:
 			d = row["date"]
 			p = row["price"]
 			m_n = row["min_nights"]
-			self.set_rate(channel_id, unit_id_z, room_id_z, rate_id_z, d, p, m_n, currency)
+			self.set_rate(channel_id, unit_id_z, room_id_z, rate_id_z, d, p, currency)
 
 	def get_reservations_summary(self, channel_id, unit_id_z):
 		"""Overview of reservations"""

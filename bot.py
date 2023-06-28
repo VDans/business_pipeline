@@ -36,6 +36,7 @@ def manage_availability():
     dbh = DatabaseHandler(db_engine, secrets)
 
     flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
+    channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking.com"
 
     if data["reservationStatus"] == '1':  # New
         logging.info(f"New booking in {flat_name}")
@@ -48,7 +49,7 @@ def manage_availability():
         date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
 
         z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=0)
-        # z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=0)
+        z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
         logging.info("Availability has been closed in both channels")
 
         # Write the "Booked" in the Google Sheet
@@ -56,81 +57,91 @@ def manage_availability():
         for d in dates1:
             cell_range = g.get_pricing_range(unit_id=flat_name,
                                              date1=d)
-            response1 = g.write_to_cell(cell_range)
-        logging.info("Wrote 'Booked' within the pricing Google Sheet")
+            response1 = g.write_to_cell(cell_range, value=channel_name)
+        logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
 
         body = f"""You have received a new reservation in {flat_name}\nName: {response['reservations']['customer']['firstName'] + ' ' + response['reservations']['customer']['lastName']}\nDates: {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\nPrice: {str(response['reservations']['rooms'][0]['totalPrice'])}"""
 
     elif data["reservationStatus"] == '2':  # Modified
         logging.info(f"Modified booking in {flat_name}")
 
-        # Get NEW reservation data:
-        response = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
-        logging.info("Retrieved reservation data")
+        try:
+            # Get NEW reservation data:
+            response = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
+            logging.info("Retrieved reservation data")
 
-        # Update OLD reservation data DB status to 'Modified'
-        dbh.curs.execute(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
-        logging.info(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
+            # Update OLD reservation data DB status to 'Modified'
+            dbh.curs.execute(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
+            logging.info(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
 
-        # Upload NEW reservation data to DB
-        dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=response)
-        logging.info("Reservation uploaded to table -bookings-")
+            # Upload NEW reservation data to DB
+            dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=response)
+            logging.info("Reservation uploaded to table -bookings-")
 
-        # Get OLD dates, and open them:
-        old_dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE status = 'Modified' AND booking_id = '{data['reservationId']}'")
-        old_date_from = pd.Timestamp(old_dates["reservation_start"][0])
-        old_date_to = pd.Timestamp(old_dates["reservation_end"][0])
-        z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to, availability=1)
-        # z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to, availability=1)
-        logging.info("Old dates have been opened in both channels")
+            # Get OLD dates, and open them:
+            old_dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE status = 'Modified' AND booking_id = '{data['reservationId']}'")
+            old_date_from = pd.Timestamp(old_dates["reservation_start"][0])
+            old_date_to = pd.Timestamp(old_dates["reservation_end"][0])
+            z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to, availability=1)
+            z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to+pd.Timedelta(days=-1), availability=1)
+            logging.info("Old dates have been opened in both channels")
 
-        # Get NEW dates, and close them:
-        new_date_from = pd.Timestamp(response["reservations"]["rooms"][0]["arrivalDate"])
-        new_date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
-        z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to, availability=0)
-        # z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to, availability=0)
-        logging.info("New dates have been closed in both channels")
+            # Get NEW dates, and close them:
+            new_date_from = pd.Timestamp(response["reservations"]["rooms"][0]["arrivalDate"])
+            new_date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
+            z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to, availability=0)
+            z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
+            logging.info("New dates have been closed in both channels")
 
-        # Remove the "Booked" in the Google Sheet
-        dates1 = list(pd.date_range(start=old_date_from, end=(old_date_to+pd.Timedelta(days=-1))))
-        for d in dates1:
-            cell_range = g.get_pricing_range(unit_id=flat_name,
-                                             date1=d)
-            response1 = g.write_to_cell(cell_range, value=4)
-        logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
+            # Remove the "Booked" in the Google Sheet
+            dates1 = list(pd.date_range(start=old_date_from, end=(old_date_to+pd.Timedelta(days=-1))))
+            for d in dates1:
+                cell_range = g.get_pricing_range(unit_id=flat_name,
+                                                 date1=d)
+                response1 = g.write_to_cell(cell_range, value=4)
+            logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
 
-        # Write the "Booked" in the Google Sheet
-        dates2 = list(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
-        for d in dates2:
-            cell_range = g.get_pricing_range(unit_id=flat_name,
-                                             date1=d)
-            response1 = g.write_to_cell(cell_range)
-        logging.info("Wrote 'Booked' within the pricing Google Sheet")
+            # Write the "Booked" in the Google Sheet
+            dates2 = list(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
+            for d in dates2:
+                cell_range = g.get_pricing_range(unit_id=flat_name,
+                                                 date1=d)
+                response1 = g.write_to_cell(cell_range, value=channel_name)
+            logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
 
-        body = f"Modified Booking in {flat_name}:\n{new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}\n"
+            body = f"Modified Booking in {flat_name}:\n{new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}\n"
+
+        except KeyError as ke:
+            logging.error(f"ERROR in the processing of the modification: {ke}")
+            body = f"ERROR: Could not process modification"
 
     elif data["reservationStatus"] == '3':  # Cancelled
         logging.info(f"Cancelled booking in {flat_name}")
 
-        dbh.curs.execute(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
-        logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
-        dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
-        date_from = pd.Timestamp(dates["reservation_start"][0])
-        date_to = pd.Timestamp(dates["reservation_end"][0])
+        try:
+            dbh.curs.execute(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+            logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+            dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
+            date_from = pd.Timestamp(dates["reservation_start"][0])
+            date_to = pd.Timestamp(dates["reservation_end"][0])
 
-        z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=1)
-        # z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=1)
-        logging.info("Availability has been opened in both channels")
+            z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=1)
+            z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=1)
+            logging.info("Availability has been opened in both channels")
 
-        # Remove the "Booked" in the Google Sheet
-        dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
-        for d in dates1:
-            cell_range = g.get_pricing_range(unit_id=flat_name,
-                                             date1=d)
-            response1 = g.write_to_cell(cell_range, value=4)
-        logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
+            # Remove the "Booked" in the Google Sheet
+            dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
+            for d in dates1:
+                cell_range = g.get_pricing_range(unit_id=flat_name,
+                                                 date1=d)
+                response1 = g.write_to_cell(cell_range, value=4)
+            logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
 
-        body = f"Cancelled Booking in {flat_name}:\n{date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\n"
+            body = f"Cancelled Booking in {flat_name}:\n{date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\n"
+
+        except KeyError as ke:
+            logging.error(f"ERROR in the processing of the cancellation: {ke}")
+            body = f"ERROR: Could not process cancellation"
 
     else:
         logging.error(f"reservationStatus not understood: {data['reservationStatus']}")
@@ -178,38 +189,43 @@ def get_prices():
             # Pushing data through Zodomus:
             if data["value_type"] == "Price":
                 response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
-                logging.info(f"Booking response: {response1}")
-                # response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
-                # logging.info(f"Airbnb response: {response2}")
+                logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
+                response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
+                logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
             elif data["value_type"] == "Min.":
+
+                # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
+                # Therefore, you also have to communicate the price next to the min nights requirements...
+                rightCellValue = int(data["rightCellValue"])
+
                 # 1. Make sure the dates are open:
                 response0 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
-                logging.info(f"Booking response: {response0}")
-                # response0 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
-                # logging.info(f"Airbnb response: {response0}")
+                logging.info(f"Booking response: {response0.json()['status']['returnMessage']}")
+                response0 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
+                logging.info(f"Airbnb response: {response0.json()['status']['returnMessage']}")
 
                 # 2. Change the minimum nights on the platforms
                 response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
-                logging.info(f"Booking response: {response1}")
-                # response2 = z.set_minimum_nights(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, min_nights=value)
-                # logging.info(f"Airbnb response: {response2}")
+                logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
+                response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=rightCellValue, min_nights=value)  # Fucking hate this...
+                logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
                 if str(value) == "0":
                     # 3. If min_nights = 0: Close the room for the night in both channels
                     logging.info("Min. Nights set to 0. Closing the room.")
                     response3 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
-                    logging.info(f"Booking response: {response3}")
-                    # response4 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
-                    # logging.info(f"Airbnb response: {response4}")
+                    logging.info(f"Booking response: {response3.json()['status']['returnMessage']}")
+                    response4 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
+                    logging.info(f"Airbnb response: {response4.json()['status']['returnMessage']}")
 
             else:
                 response1 = response2 = "value_type data not one of 'Price' or 'Min.'"
                 logging.warning(f"Response: {response1}")
 
         except ValueError:
-            if data["new_value"][i][0] == "Booked":
-                logging.warning(f"New 'Booked' value entered. Skipping the logic.")
+            if data["new_value"][i][0] in ["Booked", "Airbnb", "Booking.com"]:
+                logging.warning(f"New '{data['new_value'][i][0]}' value entered. Skipping the logic.")
             else:
                 logging.warning(f"Value entered is not a valid integer. Skipping the logic.")
 
@@ -217,4 +233,4 @@ def get_prices():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
