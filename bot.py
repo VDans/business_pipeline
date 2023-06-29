@@ -2,6 +2,7 @@ import json
 import logging
 import pandas as pd
 from flask import Flask, request
+
 from twilio.rest import Client
 
 from sqlalchemy import create_engine
@@ -14,9 +15,9 @@ logging.basicConfig(level=logging.INFO)
 secrets = json.load(open('config_secrets.json'))
 
 
-@app.route('/', methods=['POST'])
+@app.route('/', methods=['GET', 'POST'])
 def hello_world():
-    return str("Hello world!")
+    return str("Welcome to the Pricing Web App of Host-It Gmbh")
 
 
 @app.route('/availability', methods=['POST'])
@@ -194,11 +195,6 @@ def get_prices():
                 logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
             elif data["value_type"] == "Min.":
-
-                # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
-                # Therefore, you also have to communicate the price next to the min nights requirements...
-                rightCellValue = int(data["rightCellValue"])
-
                 # 1. Make sure the dates are open:
                 response0 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
                 logging.info(f"Booking response: {response0.json()['status']['returnMessage']}")
@@ -206,9 +202,12 @@ def get_prices():
                 logging.info(f"Airbnb response: {response0.json()['status']['returnMessage']}")
 
                 # 2. Change the minimum nights on the platforms
+                # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
+                # Therefore, you also have to communicate the price next to the min nights requirements...
+                right_cell_value = int(data["rightCellValue"][i][0])
                 response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
                 logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
-                response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=rightCellValue, min_nights=value)  # Fucking hate this...
+                response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
                 logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
                 if str(value) == "0":
@@ -232,5 +231,37 @@ def get_prices():
     return str("Thanks Google!")
 
 
+@app.route('/online-check-in', methods=['POST'])
+def check_in_online():
+    """
+    Receive webhook from Form Builder Website with needed data
+    """
+    data = request.json
+    fa = data["form_response"]["answers"]
+
+    db_engine = create_engine(url=secrets["database"]["url"])
+
+    out = pd.DataFrame({
+        "complete_name": [fa[0]["text"]],
+        "birth_date": [pd.Timestamp(fa[1]["date"])],
+        "nationality": [fa[2]["choice"]["label"]],
+        "address": [f"{fa[3]['text']} {fa[4]['text']} {fa[5]['text']} {fa[6]['text']} {fa[7]['text']}"],
+        "country": [fa[8]["text"]],
+        "email_address": [fa[9]["email"]],
+        "phone_number": [fa[10]["phone_number"]],
+        "id_type": [fa[11]["choice"]["label"]],
+        "eta": [fa[12]["text"]],
+        "beds": [fa[13]["text"]],
+        "wishes": [fa[14]["text"] if len(fa) > 14 else None]
+    })
+
+    out.to_sql(name="checkin_data",
+               con=db_engine,
+               if_exists="append",
+               index=False)
+
+    return str("Thanks for checking in!")
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
