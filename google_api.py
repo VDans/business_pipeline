@@ -78,25 +78,51 @@ class Google:
 
         return response
 
-    def merge_cells(self, sheet_name: str, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int):
+    def merge_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int):
         """
         Merge a cells range
         Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
         """
-        response = self.service_sheet.spreadsheets().values().batchUpdate(
+        response = self.service_sheet.spreadsheets().batchUpdate(
             spreadsheetId=self.sheet_id,
             body={
                 "requests": [
                     {
                         "mergeCells": {
                             "range": {
-                                "sheetId": sheet_name,
+                                "sheetId": internal_sheet_id,
                                 "startRowIndex": n_row_start,
                                 "endRowIndex": n_row_end,
                                 "startColumnIndex": n_col_start,
                                 "endColumnIndex": n_col_end
                             },
                             "mergeType": "MERGE_ALL"
+                        }
+                    }
+                ]
+            }
+        ).execute()
+
+        return response
+
+    def unmerge_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int):
+        """
+        Merge a cells range
+        Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
+        """
+        response = self.service_sheet.spreadsheets().batchUpdate(
+            spreadsheetId=self.sheet_id,
+            body={
+                "requests": [
+                    {
+                        "unmergeCells": {
+                            "range": {
+                                "sheetId": internal_sheet_id,
+                                "startRowIndex": n_row_start,
+                                "endRowIndex": n_row_end,
+                                "startColumnIndex": n_col_start,
+                                "endColumnIndex": n_col_end
+                            }
                         }
                     }
                 ]

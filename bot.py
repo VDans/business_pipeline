@@ -42,12 +42,12 @@ def manage_availability():
     if data["reservationStatus"] == '1':  # New
         logging.info(f"New booking in {flat_name}")
 
-        response = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
+        reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
         logging.info("Retrieved reservation data")
-        dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=response)
+        dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=reservation_z)
         logging.info("Reservation uploaded to table -bookings-")
-        date_from = pd.Timestamp(response["reservations"]["rooms"][0]["arrivalDate"])
-        date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
+        date_from = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["arrivalDate"])
+        date_to = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["departureDate"])
 
         z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=0)
         z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
@@ -67,8 +67,9 @@ def manage_availability():
         # g.merge_cells(sheet_name="Pricing", n_row_start=1)
 
         logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
+        n_guests = get_n_guests(reservation_z)
 
-        body = f"""You have received a new reservation in {flat_name}\nName: {response['reservations']['customer']['firstName'] + ' ' + response['reservations']['customer']['lastName']}\nDates: {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\nPrice: {str(response['reservations']['rooms'][0]['totalPrice'])}"""
+        body = f"""Hello!\nYou have received a new booking in {flat_name}.\n{reservation_z['reservations']['customer']['firstName'] + ' ' + reservation_z['reservations']['customer']['lastName']} booked your flat for {n_guests} guests\nThe stay is from {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}.\nThe price is {str(reservation_z['reservations']['rooms'][0]['totalPrice'])}.\nThis is an automatic message, do not reply. \nHave a nice day!"""
 
     elif data["reservationStatus"] == '2':  # Modified
         logging.info(f"Modified booking in {flat_name}")
@@ -273,6 +274,21 @@ def check_in_online():
     logging.info(f"Data uploaded to the DB with success: {fa[0]['text']}")
 
     return str("Thanks for checking in!")
+
+
+def get_n_guests(reservation_z):
+    """Get number of guests from shitty reservation format"""
+    data = reservation_z["reservations"]
+    # The way n_adults and n_children are written is shameful in the API...
+    adults = 0
+    children = 0
+    guests = data["rooms"][0]["guestCount"]  # List of dicts
+    for g in guests:
+        if g["adult"] == 1:
+            adults += int(g["count"])
+        else:
+            children += int(g["count"])
+    return adults + children
 
 
 if __name__ == '__main__':

@@ -42,5 +42,8 @@ CANCELLED BOOKING comes in:
 5. Add the flat the Google Sheet columns
 Should be good!
 
+### CLEANING SCHEDULE ###
+Goal: Table with dates as rows and flat as columns, number of guests as cell content.
+
 ### TESTING ###
 Make sure the dev or prd in zodomus_api is on both creds.
