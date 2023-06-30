@@ -78,36 +78,25 @@ class Google:
 
         return response
 
-    def merge_cells(self, sheet_name: str, cell_range: str):
-        """Merge a cells range"""
+    def merge_cells(self, sheet_name: str, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int):
+        """
+        Merge a cells range
+        Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
+        """
         response = self.service_sheet.spreadsheets().values().batchUpdate(
             spreadsheetId=self.sheet_id,
-            valueInputOption="USER_ENTERED",
-            range=cell_range,
             body={
                 "requests": [
                     {
                         "mergeCells": {
                             "range": {
                                 "sheetId": sheet_name,
-                                "startRowIndex": 0,
-                                "endRowIndex": 2,
-                                "startColumnIndex": 0,
-                                "endColumnIndex": 2
+                                "startRowIndex": n_row_start,
+                                "endRowIndex": n_row_end,
+                                "startColumnIndex": n_col_start,
+                                "endColumnIndex": n_col_end
                             },
                             "mergeType": "MERGE_ALL"
-                        }
-                    },
-                    {
-                        "mergeCells": {
-                            "range": {
-                                "sheetId": sheet_name,
-                                "startRowIndex": 2,
-                                "endRowIndex": 6,
-                                "startColumnIndex": 0,
-                                "endColumnIndex": 2
-                            },
-                            "mergeType": "MERGE_COLUMNS"
                         }
                     }
                 ]
@@ -124,3 +113,8 @@ class Google:
         out = float(delta.days) + (float(delta.seconds) / 86400)
 
         return out
+
+    @staticmethod
+    def n_to_col(n_col: int):
+        """Get col letter from integer"""
+        pass

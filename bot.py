@@ -53,12 +53,19 @@ def manage_availability():
         z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
         logging.info("Availability has been closed in both channels")
 
-        # Write the "Booked" in the Google Sheet
+        # Write the channel in the Google Sheet:
         dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
         for d in dates1:
             cell_range = g.get_pricing_range(unit_id=flat_name,
                                              date1=d)
             response1 = g.write_to_cell(cell_range, value=channel_name)
+
+        # Merge the cells based on the first one:
+        # range_start = g.get_pricing_range(unit_id=flat_name, date1=min(dates1))
+        # range_end = g.get_pricing_range(unit_id=flat_name, date1=max(dates1))
+
+        # g.merge_cells(sheet_name="Pricing", n_row_start=1)
+
         logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
 
         body = f"""You have received a new reservation in {flat_name}\nName: {response['reservations']['customer']['firstName'] + ' ' + response['reservations']['customer']['lastName']}\nDates: {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\nPrice: {str(response['reservations']['rooms'][0]['totalPrice'])}"""
@@ -149,11 +156,11 @@ def manage_availability():
         body = f"reservationStatus not understood: {data['reservationStatus']}"
 
     # Send response by Whatsapp Message:
-    client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
-    for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
-        client.messages.create(from_="whatsapp:+436703085269",
-                               to=n,
-                               body=body)
+    # client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
+    # for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
+    #     client.messages.create(from_="whatsapp:+436703085269",
+    #                            to=n,
+    #                            body=body)
 
     dbh.close_engine()
 
@@ -237,7 +244,10 @@ def check_in_online():
     Receive webhook from Form Builder Website with needed data
     """
     data = request.json
+    logging.info("\nNew Request-------------------------------------------------------------------------------------")
+
     fa = data["form_response"]["answers"]
+    logging.info(f"New online check-in submitted. Uploading to DB...")
 
     db_engine = create_engine(url=secrets["database"]["url"])
 
@@ -259,6 +269,8 @@ def check_in_online():
                con=db_engine,
                if_exists="append",
                index=False)
+
+    logging.info(f"Data uploaded to the DB with success: {fa[0]['text']}")
 
     return str("Thanks for checking in!")
 
