@@ -62,10 +62,7 @@ def manage_availability():
             response1 = g.write_to_cell(cell_range, value=channel_name)
 
         # Merge the cells based on the first one:
-        # range_start = g.get_pricing_range(unit_id=flat_name, date1=min(dates1))
-        # range_end = g.get_pricing_range(unit_id=flat_name, date1=max(dates1))
-
-        # g.merge_cells(sheet_name="Pricing", n_row_start=1)
+        g.merge_cells2(date_from, date_to, flat_name)
 
         logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
         n_guests = get_n_guests(reservation_z)
@@ -109,6 +106,9 @@ def manage_availability():
                 cell_range = g.get_pricing_range(unit_id=flat_name,
                                                  date1=d)
                 response1 = g.write_to_cell(cell_range, value=4)
+
+            # Unmerge the cells based on the first one:
+            g.unmerge_cells2(old_date_from, old_date_to, flat_name)
             logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
 
             # Write the "Booked" in the Google Sheet
@@ -117,6 +117,7 @@ def manage_availability():
                 cell_range = g.get_pricing_range(unit_id=flat_name,
                                                  date1=d)
                 response1 = g.write_to_cell(cell_range, value=channel_name)
+            g.merge_cells2(new_date_from, new_date_to, flat_name)
             logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
 
             body = f"Modified Booking in {flat_name}:\n{new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}\n"
@@ -145,6 +146,8 @@ def manage_availability():
                 cell_range = g.get_pricing_range(unit_id=flat_name,
                                                  date1=d)
                 response1 = g.write_to_cell(cell_range, value=4)
+            # Unmerge the cells based on the first one:
+            g.unmerge_cells2(date_from, date_to, flat_name)
             logging.info("Remove the 'Booked' tag within the pricing Google Sheet")
 
             body = f"Cancelled Booking in {flat_name}:\n{date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\n"
@@ -158,11 +161,11 @@ def manage_availability():
         body = f"reservationStatus not understood: {data['reservationStatus']}"
 
     # Send response by Whatsapp Message:
-    # client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
-    # for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
-    #     client.messages.create(from_="whatsapp:+436703085269",
-    #                            to=n,
-    #                            body=body)
+    client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
+    for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
+        client.messages.create(from_="whatsapp:+436703085269",
+                               to=n,
+                               body=body)
 
     dbh.close_engine()
 
@@ -255,27 +258,34 @@ def check_in_online():
     logging.info(f"New online check-in submitted. Uploading to DB...")
 
     db_engine = create_engine(url=secrets["database"]["url"])
+    dbh = DatabaseHandler(db_engine, secrets)
 
-    out = pd.DataFrame({
-        "complete_name": [fa[0]["text"]],
-        "birth_date": [pd.Timestamp(fa[1]["date"])],
-        "nationality": [fa[2]["choice"]["label"]],
-        "address": [f"{fa[3]['text']} {fa[4]['text']} {fa[5]['text']} {fa[6]['text']} {fa[7]['text']}"],
-        "country": [fa[8]["text"]],
-        "email_address": [fa[9]["email"]],
-        "phone_number": [fa[10]["phone_number"]],
-        "id_type": [fa[11]["choice"]["label"]],
-        "eta": [fa[12]["text"]],
-        "beds": [fa[13]["text"]],
-        "wishes": [fa[14]["text"] if len(fa) > 14 else None]
-    })
+    try:
+        out = pd.DataFrame({
+            "complete_name": [fa[0]["text"]],
+            "birth_date": [pd.Timestamp(fa[1]["date"])],
+            "nationality": [fa[2]["choice"]["label"]],
+            "address": [f"{fa[3]['text']} {fa[4]['text']} {fa[5]['text']} {fa[6]['text']} {fa[7]['text']}"],
+            "country": [fa[8]["text"]],
+            "email_address": [fa[9]["email"]],
+            "phone_number": [fa[10]["phone_number"]],
+            "id_type": [fa[11]["choice"]["label"]],
+            "eta": [fa[12]["text"]],
+            "beds": [fa[13]["text"]],
+            "wishes": [fa[14]["text"] if len(fa) > 14 else None]
+        })
 
-    out.to_sql(name="checkin_data",
-               con=db_engine,
-               if_exists="append",
-               index=False)
+        out.to_sql(name="checkin_data",
+                   con=db_engine,
+                   if_exists="append",
+                   index=False)
 
-    logging.info(f"Data uploaded to the DB with success: {fa[0]['text']}")
+        logging.info(f"Data uploaded to the DB with success: {fa[0]['text']}")
+
+    except Exception as e:
+        logging.error(f"Could not map the online check-in fields to the database fields: {e}")
+
+    dbh.close_engine()
 
     return str("Thanks for checking in!")
 
@@ -296,4 +306,4 @@ def get_n_guests(reservation_z):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

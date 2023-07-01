@@ -43,7 +43,7 @@ CANCELLED BOOKING comes in:
 1. Add the flat to Zodomus
 2. Accept on Booking.com and Airbnb
 3. Get the flat propertyId, roomId, rateId from Zodomus
-4. Write the credentials to the config_secrets file under "booking_flat_columns", "flat_names", "airbnb", "booking.com"
+4. Write the credentials to the config_secrets file under "booking_flat_columns", "booking_flat_columns_index", "flat_names", "airbnb", "booking.com"
 5. Add the flat the Google Sheet columns
 Should be good!
 
