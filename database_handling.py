@@ -48,7 +48,7 @@ class DatabaseHandler:
             "guest_origin": f"""{data["customer"]["address"]} {data["customer"]["city"]} {data["customer"]["zipCode"]} {data["customer"]["countryCode"]}""",
             "adults": adults,
             "children": children,
-            "platform": "Booking.com" if str(channel_id_z) == "1" else "Airbnb",
+            "platform": "Booking" if str(channel_id_z) == "1" else "Airbnb",
             "nights_price": float(data["rooms"][0]["totalPrice"]),
             "cleaning": cleaning_fee,
             "extras": None,  # Can't know until I've processed an Airbnb Reservation. None in Booking.com.

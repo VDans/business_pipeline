@@ -1,3 +1,8 @@
+### TODOS ###
+- TASK CHECKING SYNC BETWEEN SHEET AND PLATFORMS EVERY X HOURS.
+- Merging cells
+- Cleaning schedule including ETAs
+
 ### DATABASE ###
 Tables:
 - bookings

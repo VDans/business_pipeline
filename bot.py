@@ -29,6 +29,7 @@ def manage_availability():
     3. Using the dates and property retrieved in (.2), close dates using the API call.
     """
     data = request.json
+    logging.info("\n------------------------------------------------------------------------------------------------")
     logging.info("\nNew Request-------------------------------------------------------------------------------------")
 
     z = Zodomus(secrets=secrets)
@@ -37,7 +38,7 @@ def manage_availability():
     dbh = DatabaseHandler(db_engine, secrets)
 
     flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
-    channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking.com"
+    channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
     if data["reservationStatus"] == '1':  # New
         logging.info(f"New booking in {flat_name}")
@@ -174,7 +175,9 @@ def get_prices():
     This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
     """
     data = request.json
+    logging.info("\n------------------------------------------------------------------------------------------------")
     logging.info("\nNew Request-------------------------------------------------------------------------------------")
+    logging.info(data)
 
     z = Zodomus(secrets=secrets)
 
@@ -187,13 +190,12 @@ def get_prices():
     rate_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["rateId"]
 
     for i in range(len(data["new_value"])):
-
         try:
             # Clean Date and Value
             date = pd.Timestamp(data["date"][i][0])
             value = int(data["new_value"][i][0])  # Price and min nights as integers. No real need for decimals...
 
-            logging.info(f"Extracting data: \nProperty: {data['flat_name']}\nDate: {date.strftime('%Y-%m-%d')}\n{data['value_type']}: {value} \n---------------")
+            logging.info(f"Extracting data: \nProperty: {data['flat_name']}\nDate: {date.strftime('%Y-%m-%d')}\n{data['value_type']}: {value}")
 
             # Pushing data through Zodomus:
             if data["value_type"] == "Price":
@@ -203,21 +205,6 @@ def get_prices():
                 logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
             elif data["value_type"] == "Min.":
-                # 1. Make sure the dates are open:
-                response0 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
-                logging.info(f"Booking response: {response0.json()['status']['returnMessage']}")
-                response0 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
-                logging.info(f"Airbnb response: {response0.json()['status']['returnMessage']}")
-
-                # 2. Change the minimum nights on the platforms
-                # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
-                # Therefore, you also have to communicate the price next to the min nights requirements...
-                right_cell_value = int(data["rightCellValue"][i][0])
-                response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
-                logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
-                response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
-                logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
-
                 if str(value) == "0":
                     # 3. If min_nights = 0: Close the room for the night in both channels
                     logging.info("Min. Nights set to 0. Closing the room.")
@@ -226,15 +213,31 @@ def get_prices():
                     response4 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
                     logging.info(f"Airbnb response: {response4.json()['status']['returnMessage']}")
 
+                else:
+                    # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
+                    response0 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
+                    logging.info(f"Booking response: {response0.json()['status']['returnMessage']}")
+                    response0 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
+                    logging.info(f"Airbnb response: {response0.json()['status']['returnMessage']}")
+
+                    # 2. Change the minimum nights on the platforms
+                    # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
+                    # Therefore, you also have to communicate the price next to the min nights requirements...
+                    right_cell_value = int(data["rightCellValue"][i][0])
+                    response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
+                    logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
+                    response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
+                    logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
+
             else:
                 response1 = response2 = "value_type data not one of 'Price' or 'Min.'"
                 logging.warning(f"Response: {response1}")
 
         except ValueError:
-            if data["new_value"][i][0] in ["Booked", "Airbnb", "Booking.com"]:
+            if data["new_value"][i][0] in ["Booked", "Airbnb", "Booking.com", "Booking"]:
                 logging.warning(f"New '{data['new_value'][i][0]}' value entered. Skipping the logic.")
             else:
-                logging.warning(f"Value entered is not a valid integer. Skipping the logic.")
+                logging.warning(f"Value {data['new_value'][i][0]} entered is not a valid input. Skipping the logic.")
 
     return str("Thanks Google!")
 
@@ -245,6 +248,7 @@ def check_in_online():
     Receive webhook from Form Builder Website with needed data
     """
     data = request.json
+    logging.info("\n------------------------------------------------------------------------------------------------")
     logging.info("\nNew Request-------------------------------------------------------------------------------------")
 
     fa = data["form_response"]["answers"]
@@ -292,4 +296,4 @@ def get_n_guests(reservation_z):
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
