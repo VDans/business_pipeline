@@ -161,11 +161,11 @@ def manage_availability():
         body = f"reservationStatus not understood: {data['reservationStatus']}"
 
     # Send response by Whatsapp Message:
-    client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
-    for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
-        client.messages.create(from_="whatsapp:+436703085269",
-                               to=n,
-                               body=body)
+    # client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
+    # for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
+    #     client.messages.create(from_="whatsapp:+436703085269",
+    #                            to=n,
+    #                            body=body)
 
     dbh.close_engine()
 
@@ -184,13 +184,19 @@ def get_prices():
 
     z = Zodomus(secrets=secrets)
 
-    # Find out the booking and airbnb propertyId
-    property_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["propertyId"]
-    room_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["roomId"]
-    rate_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["rateId"]
-    property_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["propertyId"]
-    room_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["roomId"]
-    rate_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["rateId"]
+    try:
+        # Find out the booking and airbnb propertyId
+        property_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["propertyId"]
+        room_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["roomId"]
+        rate_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["rateId"]
+        property_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["propertyId"]
+        room_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["roomId"]
+        rate_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["rateId"]
+
+    except KeyError:
+        logging.error(f"Could not find flat name: {data['flat_name']}, is it possible you're adding columns?")
+
+        return str("Thanks Google.")
 
     for i in range(len(data["new_value"])):
         try:
