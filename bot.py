@@ -254,7 +254,8 @@ def get_prices():
 @app.route('/online-check-in', methods=['POST'])
 def check_in_online():
     """
-    Receive webhook from Form Builder Website with needed data
+    Receive webhook from TypeForm Website with needed data.
+    This call also triggers the expedition of the check-in instructions to the
     """
     data = request.json
     logging.info("\n------------------------------------------------------------------------------------------------")
