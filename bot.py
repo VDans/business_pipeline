@@ -33,7 +33,7 @@ def manage_availability():
     logging.info("\nNew Request-------------------------------------------------------------------------------------")
 
     z = Zodomus(secrets=secrets)
-    g = Google(secrets=secrets)
+    g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     db_engine = create_engine(url=secrets["database"]["url"])
     dbh = DatabaseHandler(db_engine, secrets)
 

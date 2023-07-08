@@ -7,11 +7,11 @@ from googleapiclient.discovery import build
 
 
 class Google:
-    def __init__(self, secrets):
+    def __init__(self, secrets, workbook_id):
         self.secrets = secrets
         self.logger = logging.getLogger()
         self.service_account_file = "google_secrets.json"
-        self.sheet_id = "17c7HeZQtNGJgTaE6xUaSYFI1wkPqvnxwzLqFLXRNXps"
+        self.workbook_id = workbook_id  #
 
         self.service_sheet = self.authenticate()
 
@@ -24,7 +24,7 @@ class Google:
     def write_to_cell(self, cell_range: str, value="Booked"):
         """Modify the content of a specific cell range"""
         response = self.service_sheet.spreadsheets().values().update(
-            spreadsheetId=self.sheet_id,
+            spreadsheetId=self.workbook_id,
             valueInputOption="USER_ENTERED",
             range=cell_range,
             body={
@@ -48,7 +48,7 @@ class Google:
     def write_note(self, sheet_name: str, cell_range: str, note: str):
         """Add a note to a cells range"""
         response = self.service_sheet.spreadsheets().values().batchUpdate(
-            spreadsheetId=self.sheet_id,
+            spreadsheetId=self.workbook_id,
             valueInputOption="USER_ENTERED",
             range=cell_range,
             body={
@@ -86,7 +86,7 @@ class Google:
         Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
         """
         response = self.service_sheet.spreadsheets().batchUpdate(
-            spreadsheetId=self.sheet_id,
+            spreadsheetId=self.workbook_id,
             body={
                 "requests": [
                     {
@@ -143,7 +143,7 @@ class Google:
         Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
         """
         response = self.service_sheet.spreadsheets().batchUpdate(
-            spreadsheetId=self.sheet_id,
+            spreadsheetId=self.workbook_id,
             body={
                 "requests": [
                     {
