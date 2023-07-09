@@ -65,7 +65,7 @@ class DatabaseHandler:
 
         self.curs.execute(sql,  data)
         col_names = [i[0].lower() for i in self.curs.description]
-        df = self.curs.fetchmany()
+        df = self.curs.fetchall()
 
         df = pd.DataFrame(data=df,
                           columns=col_names)

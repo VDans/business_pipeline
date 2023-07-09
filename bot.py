@@ -32,13 +32,13 @@ def manage_availability():
     logging.info("\n------------------------------------------------------------------------------------------------")
     logging.info("\nNew Request-------------------------------------------------------------------------------------")
 
+    flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
+    channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
+
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     db_engine = create_engine(url=secrets["database"]["url"])
     dbh = DatabaseHandler(db_engine, secrets)
-
-    flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
-    channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
     if data["reservationStatus"] == '1':  # New
         logging.info(f"New booking in {flat_name}")
@@ -57,17 +57,16 @@ def manage_availability():
         # Write the channel in the Google Sheet:
         dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
         for d in dates1:
-            cell_range = g.get_pricing_range(unit_id=flat_name,
-                                             date1=d)
+            cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
             response1 = g.write_to_cell(cell_range, value=channel_name)
 
         # Merge the cells based on the first one:
         g.merge_cells2(date_from, date_to, flat_name)
 
         logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
-        n_guests = get_n_guests(reservation_z)
+        # n_guests = get_n_guests(reservation_z)
 
-        body = f"""Hello!\nYou have received a new booking in {flat_name}.\n{reservation_z['reservations']['customer']['firstName'] + ' ' + reservation_z['reservations']['customer']['lastName']} booked your flat for {n_guests} guests\nThe stay is from {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}.\nThe price is {str(reservation_z['reservations']['rooms'][0]['totalPrice'])}.\nThis is an automatic message, do not reply. \nHave a nice day!"""
+        # body = f"""Hello!\nYou have received a new booking in {flat_name}.\n{reservation_z['reservations']['customer']['firstName'] + ' ' + reservation_z['reservations']['customer']['lastName']} booked your flat for {n_guests} guests\nThe stay is from {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}.\nThe price is {str(reservation_z['reservations']['rooms'][0]['totalPrice'])}.\nThis is an automatic message, do not reply. \nHave a nice day!"""
 
     elif data["reservationStatus"] == '2':  # Modified
         logging.info(f"Modified booking in {flat_name}")
@@ -103,8 +102,7 @@ def manage_availability():
             # Remove the "Booked" in the Google Sheet
             dates1 = list(pd.date_range(start=old_date_from, end=(old_date_to+pd.Timedelta(days=-1))))
             for d in dates1:
-                cell_range = g.get_pricing_range(unit_id=flat_name,
-                                                 date1=d)
+                cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
                 response1 = g.write_to_cell(cell_range, value=4)
 
             # Unmerge the cells based on the first one:
@@ -114,8 +112,7 @@ def manage_availability():
             # Write the "Booked" in the Google Sheet
             dates2 = list(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
             for d in dates2:
-                cell_range = g.get_pricing_range(unit_id=flat_name,
-                                                 date1=d)
+                cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
                 response1 = g.write_to_cell(cell_range, value=channel_name)
             g.merge_cells2(new_date_from, new_date_to, flat_name)
             logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet")
@@ -143,8 +140,7 @@ def manage_availability():
             # Remove the "Booked" in the Google Sheet
             dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
             for d in dates1:
-                cell_range = g.get_pricing_range(unit_id=flat_name,
-                                                 date1=d)
+                cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
                 response1 = g.write_to_cell(cell_range, value=4)
             # Unmerge the cells based on the first one:
             g.unmerge_cells2(date_from, date_to, flat_name)
