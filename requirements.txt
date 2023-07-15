@@ -6,3 +6,4 @@ requests
 SQLAlchemy
 twilio
 psycopg2
+sendgrid

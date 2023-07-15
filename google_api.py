@@ -1,9 +1,12 @@
+import base64
 import logging
+import pandas as pd
 from datetime import datetime
 
-import pandas as pd
+# from email.message import EmailMessage
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 
 class Google:
@@ -13,12 +16,20 @@ class Google:
         self.service_account_file = "google_secrets.json"
         self.workbook_id = workbook_id  #
 
-        self.service_sheet = self.authenticate()
+        self.service_sheet = self.authenticate_sheets()
+        # self.service_gmail = self.authenticate_gmail()
 
-    def authenticate(self):
+    def authenticate_sheets(self):
         credentials = service_account.Credentials.from_service_account_file(filename=self.service_account_file)
         out = build('sheets', 'v4', credentials=credentials)
-        self.logger.info("Authentication called")
+        self.logger.info("Authentication SHEETS called")
+        return out
+
+    def authenticate_gmail(self):
+        credentials = service_account.Credentials.from_service_account_file(filename=self.service_account_file)
+        delegated_creds=credentials.with_subject("office@host-it.at")
+        out = build('gmail', 'v1', credentials=delegated_creds)
+        self.logger.info("Authentication GMAIL called")
         return out
 
     def read_cell(self, cell_range: str):
@@ -67,28 +78,26 @@ class Google:
 
         return sheet_range
 
-    def write_note(self, sheet_name: str, cell_range: str, note: str):
+    def write_note(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, note: str, internal_sheet_id: int = 920578163):
         """Add a note to a cells range"""
-        response = self.service_sheet.spreadsheets().values().batchUpdate(
+        response = self.service_sheet.spreadsheets().batchUpdate(
             spreadsheetId=self.workbook_id,
-            valueInputOption="USER_ENTERED",
-            range=cell_range,
             body={
                 "requests": [
                     {
                         "updateCells": {
                             "range": {
-                                "sheetId": sheet_name,
-                                "startRowIndex": 1,
-                                "endRowIndex": 1,
-                                "startColumnIndex": 1,
-                                "endColumnIndex": 1
+                                "sheetId": internal_sheet_id,
+                                "startRowIndex": n_row_start,
+                                "endRowIndex": n_row_end,
+                                "startColumnIndex": n_col_start,
+                                "endColumnIndex": n_col_end
                             },
                             "rows": [
                                 {
                                     "values": [
                                         {
-                                            "note": "my note"
+                                            "note": note
                                         }
                                     ]
                                 }
@@ -100,6 +109,22 @@ class Google:
             }
         ).execute()
 
+        return response
+
+    def write_note2(self, date_from: pd.Timestamp, date_to: pd.Timestamp, flat_name: str, note: str, offset=45075):
+        """
+        Write note in the Google Pricing Sheet from two dates
+        """
+        start_row_incl = self.excel_date(date_from) - offset - 1  # -1, because indexing starts at 0 for the formatting!
+        end_row_excl = self.excel_date(date_to) - offset  # Should be at least +1 compared to start row
+        start_col_incl = self.secrets["booking_flat_columns_index_0"][flat_name]
+        end_col_excl = start_col_incl + 1
+
+        response = self.write_note(n_row_start=start_row_incl,
+                                   n_row_end=end_row_excl,
+                                   n_col_start=start_col_incl,
+                                   n_col_end=end_col_excl,
+                                   note=note)
         return response
 
     def merge_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int = 920578163):
@@ -138,11 +163,12 @@ class Google:
         start_col_incl = self.secrets["booking_flat_columns_index_0"][flat_name]
         end_col_excl = start_col_incl + 1
 
-        self.merge_cells(n_row_start=start_row_incl,
-                         n_row_end=end_row_excl,
-                         n_col_start=start_col_incl,
-                         n_col_end=end_col_excl,
-                         internal_sheet_id=920578163)
+        response = self.merge_cells(n_row_start=start_row_incl,
+                                    n_row_end=end_row_excl,
+                                    n_col_start=start_col_incl,
+                                    n_col_end=end_col_excl,
+                                    internal_sheet_id=920578163)
+        return response
 
     def unmerge_cells2(self, date_from: pd.Timestamp, date_to: pd.Timestamp, flat_name: str, offset=45075):
         """
@@ -153,11 +179,12 @@ class Google:
         start_col_incl = self.secrets["booking_flat_columns_index_0"][flat_name]
         end_col_excl = start_col_incl + 1
 
-        self.unmerge_cells(n_row_start=start_row_incl,
-                         n_row_end=end_row_excl,
-                         n_col_start=start_col_incl,
-                         n_col_end=end_col_excl,
-                         internal_sheet_id=920578163)
+        response = self.unmerge_cells(n_row_start=start_row_incl,
+                                      n_row_end=end_row_excl,
+                                      n_col_start=start_col_incl,
+                                      n_col_end=end_col_excl,
+                                      internal_sheet_id=920578163)
+        return response
 
     def unmerge_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int):
         """
@@ -184,6 +211,22 @@ class Google:
         ).execute()
 
         return response
+
+    # def send_gmail(self, to_email: str, body: str, subject=""):
+    #     message = EmailMessage()
+    #     message.set_content(body)
+    #     message["To"] = to_email
+    #     message["From"] = "office@host-it.at"
+    #     message["Subject"] = subject
+    #     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    #     create_message = {
+    #         'raw': encoded_message
+    #     }
+    #
+    #     try:
+    #         self.service_gmail.users().messages().send(userId="me", body=create_message).execute()
+    #     except HttpError as error:
+    #         logging.error(f'{error}')
 
     @staticmethod
     def excel_date(date1):

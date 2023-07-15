@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 
 
@@ -31,11 +33,15 @@ class DatabaseHandler:
                 children += int(g["count"])
 
         # Deal with shittily formatted Cleaning Fee:
-        fees = data["rooms"][0]["priceDetailsExtra"]  # List of extra fees
-        cleaning_fee = 0
-        for f in fees:
-            if (f["text"] == "Cleaning fee") & (f["included"] == "no"):
-                cleaning_fee += int(f["amount"])
+        try:
+            fees = data["rooms"][0]["priceDetailsExtra"]  # List of extra fees
+            cleaning_fee = 0
+            for f in fees:
+                if (f["text"] == "Cleaning fee") & (f["included"] == "no"):
+                    cleaning_fee += int(f["amount"])
+        except KeyError as ke:
+            logging.error(f"Error in finding fees for flat {unit_id_z}, with error: {ke}. Moving on with fees = 0")
+            cleaning_fee = 0
 
         out = pd.DataFrame([{
             "booking_id": data["reservation"]["id"],
