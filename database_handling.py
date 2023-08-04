@@ -10,8 +10,9 @@ class DatabaseHandler:
 
         self.curs = self.db_engine.raw_connection().cursor()
 
-    def upload_reservation(self, channel_id_z, unit_id_z, reservation_z):
-        out = self.clean_reservation_z(channel_id_z, unit_id_z, reservation_z)
+    def upload_reservation(self, channel_id_z, flat_name, reservation_z):
+        logging.info(f"Starting reservation upload")
+        out = self.clean_reservation_z(channel_id_z, flat_name, reservation_z)
         out.to_sql(
             index=False,
             con=self.db_engine,
@@ -19,7 +20,7 @@ class DatabaseHandler:
             if_exists='append'
         )
 
-    def clean_reservation_z(self, channel_id_z, unit_id_z, reservation_z):
+    def clean_reservation_z(self, channel_id_z, flat_name, reservation_z):
         data = reservation_z["reservations"]
 
         # The way n_adults and n_children are written is shameful in the API...
@@ -32,21 +33,12 @@ class DatabaseHandler:
             else:
                 children += int(g["count"])
 
-        # Deal with shittily formatted Cleaning Fee:
-        try:
-            fees = data["rooms"][0]["priceDetailsExtra"]  # List of extra fees
-            cleaning_fee = 0
-            for f in fees:
-                if (f["text"] == "Cleaning fee") & (f["included"] == "no"):
-                    cleaning_fee += int(f["amount"])
-        except KeyError as ke:
-            logging.error(f"Error in finding fees for flat {unit_id_z}, with error: {ke}. Moving on with fees = 0")
-            cleaning_fee = 0
+        cleaning_fee = self.extract_cleaning_fee(channel_id_z=channel_id_z, reservation_z=reservation_z, flat_name=flat_name)
 
         out = pd.DataFrame([{
             "booking_id": data["reservation"]["id"],
             "booking_date": data["reservation"]["bookedAt"],
-            "object": self.secrets["flat_names"][unit_id_z],
+            "object": flat_name,
             "reservation_start": pd.Timestamp(data["rooms"][0]["arrivalDate"]),
             "reservation_end": pd.Timestamp(data["rooms"][0]["departureDate"]),
             "status": "OK",
@@ -96,3 +88,20 @@ class DatabaseHandler:
 
     def close_engine(self):
         self.db_engine.dispose()
+
+    def extract_cleaning_fee(self, channel_id_z, reservation_z, flat_name):
+        logging.info(f"Extracting cleaning fee from reservation data")
+        try:
+            if str(channel_id_z == "1"):
+                fees = reservation_z["reservations"]["rooms"][0]["priceDetailsExtra"]  # List of extra fees
+                cleaning_fee = 0
+                for f in fees:
+                    if (f["text"] == "Cleaning fee") & (f["included"] == "no"):
+                        cleaning_fee += int(float(f["amount"]))
+            else:
+                cleaning_fee = int(float(reservation_z["fullResponse"]["listingCleaningFeeAccurate"]))
+        except KeyError as ke:
+            logging.error(f"Error in finding fees for flat {flat_name}, with error: {ke}. Moving on with fees = 0")
+            cleaning_fee = 0
+
+        return cleaning_fee

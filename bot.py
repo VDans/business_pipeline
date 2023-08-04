@@ -4,7 +4,6 @@ import pandas as pd
 from flask import Flask, request
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-# from twilio.rest import Client
 
 from sqlalchemy import create_engine, Table, MetaData, update
 from database_handling import DatabaseHandler
@@ -35,8 +34,19 @@ def manage_availability():
 
     try:
         reservation_status_z = data["reservationStatus"]
+        logging.info(f"Retrieved the reservationStatus: {reservation_status_z}")
+        try:
+            if str(data["channelId"]) == '1':
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_booking"] == data["propertyId"]][0]
+            else:
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]][0]
+            logging.info(f"Retrieved the flat name: {flat_name}")
 
-        flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
+        except Exception as e:
+            flat_name = "UNKNOWN"
+            logging.error(f"Could NOT retrieve the flat name because of your shitty minimalistic logic: {e}")
+
+        # flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
         channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
         z = Zodomus(secrets=secrets)
@@ -55,16 +65,19 @@ def manage_availability():
             logging.info("Retrieved reservation data")
 
             # Upload the reservation data to the DB:
-            dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=reservation_z)
-            logging.info("Reservation uploaded to table -bookings-")
+            try:
+                dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=reservation_z)
+                logging.info("Reservation uploaded to table -bookings-")
+            except Exception as e:
+                logging.error(f"Could NOT upload the new reservation to DB: {e}")
 
             # Extract dates from data:
             date_from = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["arrivalDate"])
             date_to = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["departureDate"])
 
             # Close the dates on both platforms:
-            z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=0)
-            z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
+            z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=date_from, date_to=date_to, availability=0)
+            z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
             logging.info("Availability has been closed in both channels")
 
             # In the Google Pricing Sheet:
@@ -75,12 +88,28 @@ def manage_availability():
                 response1 = g.write_to_cell(cell_range, value=channel_name)
 
             # Merge the cells based on the first one:
-            n_guests = get_n_guests(reservation_z)
-            g.merge_cells2(date_from, date_to, flat_name)
-            g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"]} {reservation_z["reservations"]["customer"]["lastName"]}\nPaid {reservation_z["reservations"]["rooms"][0]["totalPrice"]}€\nGuests: {n_guests}""")
-            logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
+            try:
+                n_guests = get_n_guests(reservation_z)
+                logging.info(f"There are {n_guests} guests.")
+            except Exception as e:
+                logging.warning(f"Couldn't obtain number of guests: {e}")
+                n_guests = -1
 
-            # body = f"""Hello!\nYou have received a new booking in {flat_name}.\n{reservation_z['reservations']['customer']['firstName'] + ' ' + reservation_z['reservations']['customer']['lastName']} booked your flat for {n_guests} guests\nThe stay is from {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}.\nThe price is {str(reservation_z['reservations']['rooms'][0]['totalPrice'])}.\nThis is an automatic message, do not reply. \nHave a nice day!"""
+            try:
+                merge_response = g.merge_cells2(date_from, date_to, flat_name)
+                logging.info(f"Merge response: {merge_response}")
+            except Exception as ex:
+                logging.error(f"Could not merge cells! Exception: {ex}")
+
+            try:
+                cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
+                total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
+                note_response = g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
+                logging.info(f"Note response: {note_response}")
+            except Exception as ex:
+                logging.error(f"Could not write note! Exception: {ex}")
+
+            logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
 
         elif reservation_status_z == '2':  # Modified
             logging.info(f"Modified booking in {flat_name}")
@@ -97,22 +126,22 @@ def manage_availability():
                     logging.info(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
 
                 # Upload NEW reservation data to DB
-                dbh.upload_reservation(channel_id_z=data["channelId"], unit_id_z=data["propertyId"], reservation_z=response)
+                dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=response)
                 logging.info("Reservation uploaded to table -bookings-")
 
                 # Get OLD dates, and open them:
                 old_dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE status = 'Modified' AND booking_id = '{data['reservationId']}'")
                 old_date_from = pd.Timestamp(old_dates["reservation_start"][0])
                 old_date_to = pd.Timestamp(old_dates["reservation_end"][0])
-                z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to, availability=1)
-                z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=old_date_from, date_to=old_date_to+pd.Timedelta(days=-1), availability=1)
+                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=old_date_from, date_to=old_date_to, availability=1)
+                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=old_date_from, date_to=old_date_to+pd.Timedelta(days=-1), availability=1)
                 logging.info("Old dates have been opened in both channels")
 
                 # Get NEW dates, and close them:
                 new_date_from = pd.Timestamp(response["reservations"]["rooms"][0]["arrivalDate"])
                 new_date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
-                z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to, availability=0)
-                z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
+                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=new_date_from, date_to=new_date_to, availability=0)
+                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
                 logging.info("New dates have been closed in both channels")
 
                 # Remove the "Booked" in the Google Sheet
@@ -133,14 +162,19 @@ def manage_availability():
                     cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
                     response1 = g.write_to_cell(cell_range, value=channel_name)
                 g.merge_cells2(new_date_from, new_date_to, flat_name)
-                g.write_note2(new_date_from, new_date_from, flat_name, f"""{response["reservations"]["customer"]["firstName"]} {response["reservations"]["customer"]["lastName"]}\nPaid {response["reservations"]["rooms"][0]["totalPrice"]}€\nGuests: {n_guests}""")
-                logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
+                try:
+                    cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=response, flat_name=flat_name)
+                    total_price = float(response["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
+                    note_response = g.write_note2(new_date_from, new_date_from, flat_name, f"""{response["reservations"]["customer"]["firstName"].title()} {response["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
+                    logging.info(f"Note response: {note_response}")
+                except Exception as ex:
+                    logging.error(f"Could not write note! Exception: {ex}")
 
-                body = f"Modified Booking in {flat_name}:\n{new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}\n"
+                logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
 
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the modification: {ke}")
-                body = f"ERROR: Could not process modification"
+                # body = f"ERROR: Could not process modification"
 
         elif reservation_status_z == '3':  # Cancelled
             logging.info(f"Cancelled booking in {flat_name}")
@@ -155,8 +189,8 @@ def manage_availability():
                 date_from = pd.Timestamp(dates["reservation_start"][0])
                 date_to = pd.Timestamp(dates["reservation_end"][0])
 
-                z.set_availability(channel_id="1", unit_id_z=secrets["booking"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["booking"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to, availability=1)
-                z.set_availability(channel_id="3", unit_id_z=secrets["airbnb"]["flat_ids"][flat_name]["propertyId"], room_id_z=secrets["airbnb"]["flat_ids"][flat_name]["roomId"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=1)
+                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=date_from, date_to=date_to, availability=1)
+                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=1)
                 logging.info("Availability has been opened in both channels")
 
                 # Remove the "Booked" in the Google Sheet
@@ -170,27 +204,17 @@ def manage_availability():
                 g.write_note2(date_from, date_from, flat_name, "")
                 logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
 
-                body = f"Cancelled Booking in {flat_name}:\n{date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}\n"
-
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the cancellation: {ke}")
-                body = f"ERROR: Could not process cancellation"
+                # body = f"ERROR: Could not process cancellation"
 
         else:
             logging.error(f"reservationStatus not understood: {reservation_status_z}")
-            body = f"reservationStatus not understood: {reservation_status_z}"
-
-        # Send response by Whatsapp Message:
-        # client = Client(secrets['twilio']['account_sid'], secrets['twilio']['auth_token'])
-        # for n in [secrets['twilio']['whatsapp_valentin']]:  #, secrets['twilio']['whatsapp_ilian']]:
-        #     client.messages.create(from_="whatsapp:+436703085269",
-        #                            to=n,
-        #                            body=body)
 
         dbh.close_engine()
 
     except Exception as e:
-        logging.error(f"Couldn't find the 'ReservationStatus' in the request.")
+        logging.error(f"Couldn't find the 'ReservationStatus' in the request: {e}")
         logging.info(f"The request says: {data}")
 
     return str("All Good!")
@@ -210,12 +234,13 @@ def get_prices():
 
     try:
         # Find out the booking and airbnb propertyId
-        property_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["propertyId"]
-        room_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["roomId"]
-        rate_id_airbnb = secrets["airbnb"]["flat_ids"][data["flat_name"]]["rateId"]
-        property_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["propertyId"]
-        room_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["roomId"]
-        rate_id_booking = secrets["booking"]["flat_ids"][data["flat_name"]]["rateId"]
+        flat_name = data["flat_name"]
+        property_id_airbnb = secrets["flats"][flat_name]["pid_airbnb"]
+        room_id_airbnb = secrets["flats"][flat_name]["rid_airbnb"]
+        rate_id_airbnb = secrets["flats"][flat_name]["rtid_airbnb"]
+        property_id_booking = secrets["flats"][flat_name]["pid_booking"]
+        room_id_booking = secrets["flats"][flat_name]["rid_booking"]
+        rate_id_booking = secrets["flats"][flat_name]["rtid_booking"]
 
     except KeyError:
         logging.error(f"Could not find flat name: {data['flat_name']}, is it possible you're adding columns?")
@@ -256,7 +281,12 @@ def get_prices():
                     # 2. Change the minimum nights on the platforms
                     # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
                     # Therefore, you also have to communicate the price next to the min nights requirements...
-                    right_cell_value = int(data["rightCellValue"][i][0])
+                    try:
+                        right_cell_value = int(data["rightCellValue"][i][0])
+                    except Exception as ex:
+                        right_cell_value = 500
+                        logging.warning(f"No price is available! Setting price to 500 while waiting for a better price: {ex}")
+
                     response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
                     logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
                     response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
@@ -266,11 +296,11 @@ def get_prices():
                 response1 = response2 = "value_type data not one of 'Price' or 'Min.'"
                 logging.warning(f"Response: {response1}")
 
-        except ValueError:
+        except ValueError as ve:
             if data["new_value"][i][0] in ["Booked", "Airbnb", "Booking.com", "Booking"]:
                 logging.warning(f"New '{data['new_value'][i][0]}' value entered. Skipping the logic.")
             else:
-                logging.warning(f"Value {data['new_value'][i][0]} entered is not a valid input. Skipping the logic.")
+                logging.warning(f"Value {data['new_value'][i][0]} entered is not a valid input. Skipping the logic: {ve}")
 
     return str("Thanks Google!")
 
@@ -327,7 +357,7 @@ def check_in_online():
             address2_json = list(filter(lambda x: x["field"]["id"] == "tHxUHfdhaCXb", fa))
             address2 = address2_json[0]['text']
         except Exception as e:
-            logging.info(f"No Address 2 found. Moving on with error: {e}")
+            logging.info(f"Guest did not enter address line 2: {e}")
             address2 = ""
 
         address3_json = list(filter(lambda x: x["field"]["id"] == "ezg8z74NJOAv", fa))
@@ -378,7 +408,7 @@ def check_in_online():
         beds = beds_json[0]["text"]
     except Exception as e:
         beds = None
-        logging.error(f"Could not find beds with error: {e}")
+        logging.error(f"Guest did not enter beds preference: {e}")
 
     out = pd.DataFrame({
         "complete_name": [complete_name],
@@ -402,12 +432,49 @@ def check_in_online():
     logging.info(f"Data uploaded to the DB with success: {complete_name}")
 
     # Find email corresponding to the booking_id:
-    _out = dbh.query_data(sql=f"""SELECT email FROM bookings WHERE booking_id = {booking_id}""")
-    if len(_out) > 0:
-        print("Yay")
-        send_check_in_instructions(recipient_email=str(_out["email"]), message="")
-    else:
-        logging.warning(f"Could NOT find the booking_id given by the guest!")
+    try:
+        _out = dbh.query_data(sql=f"""SELECT email, object FROM bookings WHERE booking_id = '{booking_id}'""")
+
+        if len(_out) > 0:
+            # Get the language:
+            language = 'german' if country in ['Austria', 'Germany'] else 'english'
+
+            # Get the flat name:
+            flat_name = _out["object"][0]
+
+            # Get the email:
+            recipient_email = _out["email"][0]
+
+            # Get the message & language:
+            _check_in_instructions = dbh.query_data(sql=f"""SELECT message FROM messages WHERE message_language = '{language}' and flat_name = '{flat_name}'""")
+            if len(_check_in_instructions) > 0:
+                check_in_instructions = _check_in_instructions["message"][0]
+                logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
+
+                # Send the email:
+                send_check_in_instructions(recipient_email=recipient_email, message=check_in_instructions)
+
+            else:
+                logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. Switching language...")
+                language = 'english' if language == 'german' else 'german'
+                _check_in_instructions = dbh.query_data(sql=f"""SELECT message FROM messages WHERE message_language = '{language}' and flat_name = '{flat_name}'""")
+
+                if len(_check_in_instructions) > 0:
+                    check_in_instructions = _check_in_instructions["message"][0]
+                    logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
+
+                    # Send the email:
+                    send_check_in_instructions(recipient_email=recipient_email, message=check_in_instructions)
+
+                else:
+                    logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. The instructions are not available in this flat...")
+
+        else:
+            send_check_in_instructions(recipient_email="office@host-it.at", message=f"The guest {complete_name} has given the comfirmation number {booking_id}, which hasn't been found in the database.\nTherefore, they have not received any instructions!\nPlease make sure the data is right, and send manually.")
+            logging.warning(f"Could NOT find the booking_id {booking_id} given by the guest! Could it be from a property outside of the system")
+
+    except Exception as e:
+        logging.error(f"Could NOT even reach the querying using this booking_id: {e}")
 
     dbh.close_engine()
 
@@ -431,10 +498,11 @@ def get_n_guests(reservation_z):
 
 def send_check_in_instructions(recipient_email: str, message: str):
     """For now, only for the properties on the system! The rest is handled by Smoobu."""
-    message = Mail(from_email='office@host-it.at',
-                   to_emails=recipient_email,
-                   html_content=message)
-
+    message = Mail(
+        from_email='office@host-it.at',
+        to_emails=recipient_email,
+        subject="Check-In instructions",
+        html_content=message)
     try:
         sg = SendGridAPIClient(api_key=secrets["twilio"]["email_api_key"])
         response = sg.send(message)

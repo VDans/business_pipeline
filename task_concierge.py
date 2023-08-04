@@ -1,10 +1,11 @@
 import logging
 import json
+import time
+
 import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
-
-from google_api import Google
+from zodomus_api import Zodomus
 
 logging.basicConfig(level=logging.INFO)
 pd.options.mode.chained_assignment = None
@@ -14,43 +15,40 @@ db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
 
 
+def close_dates_z(booking, z, flat, s):
+    time.sleep(1)
+    if s["flats"][flat]["pid_booking"] != "":
+        response = z.set_availability(channel_id="1", unit_id_z=s["flats"][flat]["pid_booking"], room_id_z=s["flats"][flat]["rid_booking"], date_from=booking["reservation_start"], date_to=booking["reservation_end"], availability=0)
+        logging.info(f"Closed {flat} on Booking.com from {booking['reservation_start']} to {booking['reservation_end']} with response: {response.json()['status']['returnMessage']}")
+
+    if s["flats"][flat]["pid_airbnb"] != "":
+        response1 = z.set_availability(channel_id="3", unit_id_z=s["flats"][flat]["pid_airbnb"], room_id_z=s["flats"][flat]["rid_airbnb"], date_from=booking["reservation_start"], date_to=booking["reservation_end"] + pd.Timedelta(days=-1), availability=0)
+        logging.info(f"Closed {flat} on Airbnb from {booking['reservation_start']} to {booking['reservation_end']} with response: {response1.json()['status']['returnMessage']}")
+
+
 def check_bookings():
     """
     This task runs once an hour.
-
-    It checks whether the availability reflected on the platforms corresponds to what is written on the Pricing Sheet.
-
-    - For each flat, get list of dates where it should be CLOSED.
-    - In Google Sheet, check if value == 0
-    - If value > 0: Send Email.
+    It checks whether the availability reflected on the platforms corresponds to what is in the database.
+    It is CRITICAL to avoid over-bookings. Therefore, it runs as a standalone. The Google interface should be in a separate script.
     """
-    # Get closed dates:
+
+    # Get bookings table:
     sql = open("sql/task_concierge.sql").read()
     bookings = dbh.query_data(sql=sql, dtypes={"reservation_start": pd.Timestamp, "reservation_end": pd.Timestamp})
-    # Important! Remove 1 day from end dates!
-    bookings["reservation_end"] = bookings["reservation_end"] - pd.Timedelta(days=1)
 
+    # Get list of flats
     flats = list(bookings["object"].unique())
-    g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
+    z = Zodomus(secrets=secrets)
 
     for flat in flats:
-        logging.info(f"Processing cleanings in flat {flat}")
+        logging.info(f"Processing bookings in flat {flat}")
         b = bookings[bookings["object"] == flat]
-        closed_dates = b.apply(lambda x: list(pd.date_range(x['reservation_start'], x['reservation_end'])), axis=1)
-        closed_dates = sum(closed_dates, [])  # Get all closed dates
 
-        # Check each value if 0, "Booking", "Airbnb", or "Booked":
-        for d in closed_dates:
-            cell_range = g.get_pricing_range(unit_id=flat, date1=d, col=secrets["flats"][flat]["pricing_col"])
-            value = g.read_cell(cell_range=cell_range)
-
-            logging.info(f"Checking {flat} - {d} - {cell_range}")
-            if value not in [0, "0", "Booking", "Airbnb", "Booked", "", " "]:
-                logging.warning(f"flat {flat} date {d} is opened with value {value}, but SHOULD NOT BE! Closing it now...")
-                g.write_to_cell(cell_range=cell_range, value=0)
+        # For each booking (list of timestamps), send a POST request to close the dates:
+        b.apply(close_dates_z, axis=1, args=(z, flat, secrets))
 
     logging.info("Ran the concierge successfully")
 
 
 check_bookings()
-
