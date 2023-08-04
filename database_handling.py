@@ -89,7 +89,8 @@ class DatabaseHandler:
     def close_engine(self):
         self.db_engine.dispose()
 
-    def extract_cleaning_fee(self, channel_id_z, reservation_z, flat_name):
+    @staticmethod
+    def extract_cleaning_fee(channel_id_z, reservation_z, flat_name):
         logging.info(f"Extracting cleaning fee from reservation data")
         try:
             if str(channel_id_z == "1"):

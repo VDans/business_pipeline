@@ -17,7 +17,7 @@ secrets = json.load(open('config_secrets.json'))
 
 @app.route('/', methods=['GET', 'POST'])
 def hello_world():
-    return str("Welcome to the Pricing Web App of Host-It Immobilien Gmbh")
+    return str("Welcome to the Pricing Web App of Host-It Immobilien GmbH")
 
 
 @app.route('/availability', methods=['POST'])
@@ -29,8 +29,8 @@ def manage_availability():
     3. Using the dates and property retrieved in (.2), close dates using the API call.
     """
     data = request.json
-    logging.info("\n------------------------------------------------------------------------------------------------")
-    logging.info("\nNew Request-------------------------------------------------------------------------------------")
+    logging.info("------------------------------------------------------------------------------------------------\n")
+    logging.info("AVAILABILITY New Request-------------------------------------------------------------------------------------\n")
 
     try:
         reservation_status_z = data["reservationStatus"]
@@ -226,9 +226,8 @@ def get_prices():
     This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
     """
     data = request.json
-    logging.info("\n------------------------------------------------------------------------------------------------")
-    logging.info("\nNew Request-------------------------------------------------------------------------------------")
-    logging.info(data)
+    logging.info("--------------------------------------------------------------------------------------------------------\n")
+    logging.info("PRICING New Request-------------------------------------------------------------------------------------\n")
 
     z = Zodomus(secrets=secrets)
 
@@ -253,7 +252,7 @@ def get_prices():
             date = pd.Timestamp(data["date"][i][0])
             value = int(data["new_value"][i][0])  # Price and min nights as integers. No real need for decimals...
 
-            logging.info(f"Extracting data: \nProperty: {data['flat_name']}\nDate: {date.strftime('%Y-%m-%d')}\n{data['value_type']}: {value}")
+            logging.info(f"Extracting data: Property: {data['flat_name']} - Date: {date.strftime('%Y-%m-%d')} - {data['value_type']}: {value}")
 
             # Pushing data through Zodomus:
             if data["value_type"] == "Price":
@@ -312,8 +311,8 @@ def check_in_online():
     This call also triggers the expedition of the check-in instructions to the
     """
     data = request.json
-    logging.info("\n------------------------------------------------------------------------------------------------")
-    logging.info("\nNew Request-------------------------------------------------------------------------------------")
+    logging.info("------------------------------------------------------------------------------------------------\n")
+    logging.info("OCI New Request-------------------------------------------------------------------------------------\n")
 
     fa = data["form_response"]["answers"]
     logging.info(f"New online check-in submitted. Uploading to DB...")
