@@ -1,5 +1,7 @@
 import logging
 import json
+import time
+import string
 import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
@@ -20,40 +22,91 @@ def write_cleanings():
 
     Get flat name, checkout date, and number of guests from each reservation.
     For each, find out the correct Google workbook id and write to the correct cell according to the flat and date.
+
+    This should be done using batchRequests!
+
     """
     sql = open("sql/task_cleanings.sql").read()
     bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_end": pd.Timestamp})
+    quota = 0
 
     flats = list(bookings["object"].unique())
-    for flat in flats:
-        logging.info(f"Processing cleanings in flat {flat}")
+    cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
+    for cs in cleaning_sheets:
+        dat = []
+        notes = []
 
         # Find the corresponding Google sheet for the specific cleaner:
-        g = Google(secrets=secrets, workbook_id=secrets["flats"][flat]["cleaning_workbook_id"])
+        g = Google(secrets=secrets, workbook_id=cs)
 
-        # Remove all current values (avoid confusion):
-        col_range = f"{secrets['flats'][flat]['cleaning_col']}2:{secrets['flats'][flat]['cleaning_col']}900"
-        response = g.clear_range(cell_range=col_range)
-        logging.info(f"Removed all current values")
+        # Clear workbook:
+        response = g.clear_range(cell_range="B2:Z1000")
+        # Clear notes: Make a large batch with notes to "":
+        response1 = g.write_note(0, 998, 0, 24, "", 0)
+        logging.info(f"Cleared worksheet of values and notes.")
 
-        # Go over the available flats
-        b = bookings[bookings["object"] == flat]
+        # Find all flats on this workbook:
+        cs_flats = [f for f in secrets['flats'] if secrets["flats"][f]["cleaning_workbook_id"] == cs]
 
-        # Shift the n_guests for each flat:
-        b['n_guests'] = b['n_guests'].shift(-1, fill_value=-1)
+        for flat in cs_flats:
+            # Filter the bookings:
+            b = bookings[bookings["object"] == flat]
+            logging.info(f"Processing cleanings in flat {flat}")
 
-        # Write the new values:
-        b.apply(write_cleaning_schedule, axis=1, args=(flat, g))
+            # Shift the n_guests, eta and for each flat:
+            b['n_guests'] = b['n_guests'].shift(-1, fill_value=-1)
+            b['eta'] = b['eta'].shift(-1, fill_value="Nicht gesagt")
+            b['beds'] = b['beds'].shift(-1, fill_value="Nicht gesagt")
+
+            # Prepare the batchRequest: for each reservation end, create a batch snippet, append it to the data dict.
+            b.apply(add_data_snippet, axis=1, args=(dat, flat, g))
+            b.apply(add_notes_snippet, axis=1, args=(notes, flat, g))
+
+        # Once you are done with the workbook, execute the batchRequest:
+        g.batch_write_to_cell(data=dat)
+        g.batch_write_notes(requests=notes)
+        quota += 1
+        logging.info(f"QUOTA: {quota}")
 
     logging.info("Processed all cleanings within 31 days.")
 
 
-def write_cleaning_schedule(booking, flat, google):
-    logging.info(f"-- Adding {booking['reservation_end'].strftime('%Y-%m-%d')}")
-
-    # Write to the correct date the number of guests:
+def add_data_snippet(booking, data, flat, google):
     cell_range = google.get_pricing_range(unit_id=flat, date1=booking["reservation_end"], col=secrets["flats"][flat]["cleaning_col"], offset=45106)
-    response = google.write_to_cell(cell_range, value=str(booking["n_guests"]))
+    snippet = {
+        "range": cell_range,
+        "values": [
+            [booking["n_guests"]]
+        ]
+    }
+    data.append(snippet)
+
+
+def add_notes_snippet(booking, notes, flat, google, offset=45106):
+    note_body = f"""- ANKUNFT -\n{booking['eta']}\n\n- WÜNSCHE -\n{booking['beds']}"""
+
+    snippet = {
+        "updateCells": {
+            "range": {
+                "sheetId": 0,
+                "startRowIndex": google.excel_date(booking["reservation_end"]) - offset - 1,
+                "endRowIndex": google.excel_date(booking["reservation_end"]) - offset,
+                "startColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]),
+                "endColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]) + 1
+            },
+            "rows": [
+                {
+                    "values": [
+                        {
+                            "note": note_body
+                        }
+                    ]
+                }
+            ],
+            "fields": "note"
+        }
+    }
+    notes.append(snippet)
 
 
 write_cleanings()

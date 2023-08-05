@@ -81,10 +81,14 @@ def manage_availability():
 
             # In the Google Pricing Sheet:
             # Write the channel:
-            dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
-            for d in dates1:
-                cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
-                response1 = g.write_to_cell(cell_range, value=channel_name)
+            try:
+                dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
+                dat = []
+                dates_range.apply(add_write_snippet, args=(g, dat, flat_name, channel_name))
+                g.batch_write_to_cell(data=dat)
+
+            except Exception as ex:
+                logging.warning(f"Could not write to sheet: {ex}")
 
             # Merge the cells based on the first one:
             try:
@@ -97,7 +101,7 @@ def manage_availability():
             try:
                 g.merge_cells2(date_from, date_to, flat_name)
             except Exception as ex:
-                logging.error(f"Could not merge cells! Exception: {ex}")
+                logging.error(f"Could not merge cells with exception: {ex}")
 
             try:
                 cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
@@ -141,24 +145,41 @@ def manage_availability():
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
                 logging.info("New dates have been closed in both channels")
 
-                # Remove the "Booked" in the Google Sheet
-                dates1 = list(pd.date_range(start=old_date_from, end=(old_date_to+pd.Timedelta(days=-1))))
-                for d in dates1:
-                    cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
-                    response1 = g.write_to_cell(cell_range, value=4)
-
                 # Unmerge the cells based on the first one:
-                g.unmerge_cells2(old_date_from, old_date_to, flat_name)
-                g.write_note2(old_date_from, old_date_from, flat_name, "")
+                try:
+                    g.unmerge_cells2(old_date_from, old_date_to, flat_name)
+                    g.write_note2(old_date_from, old_date_from, flat_name, "")
+                except Exception as ex:
+                    logging.warning(f"Could not unmerge and remove the note: {ex}")
+
+                # Remove the "Booked" in the Google Sheet and replace with 4 nights by default
+                try:
+                    dates_range = pd.Series(pd.date_range(start=old_date_from, end=(old_date_to - pd.Timedelta(days=1))))
+                    dat = []
+                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, 4))
+                    g.batch_write_to_cell(data=dat)
+                except Exception as ex:
+                    logging.warning(f"Could not write to sheet: {ex}")
+
                 logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
 
                 # Write the "Booked" in the Google Sheet
                 n_guests = get_n_guests(response)
-                dates2 = list(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
-                for d in dates2:
-                    cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
-                    response1 = g.write_to_cell(cell_range, value=channel_name)
-                g.merge_cells2(new_date_from, new_date_to, flat_name)
+
+                try:
+                    dates_range = pd.Series(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
+                    dat = []
+                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, channel_name))
+                    g.batch_write_to_cell(data=dat)
+
+                except Exception as ex:
+                    logging.warning(f"Could not write to sheet: {ex}")
+
+                try:
+                    g.merge_cells2(new_date_from, new_date_to, flat_name)
+                except Exception as ex:
+                    logging.error(f"Could not merge cells with exception: {ex}")
+
                 try:
                     cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=response, flat_name=flat_name)
                     total_price = float(response["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
@@ -189,16 +210,23 @@ def manage_availability():
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=1)
                 logging.info("Availability has been opened in both channels")
 
-                # Remove the "Booked" in the Google Sheet
-                dates1 = list(pd.date_range(start=date_from, end=(date_to+pd.Timedelta(days=-1))))
-                for d in dates1:
-                    cell_range = g.get_pricing_range(unit_id=flat_name, date1=d)
-                    response1 = g.write_to_cell(cell_range, value=4)
-
                 # Unmerge the cells based on the first one:
-                g.unmerge_cells2(date_from, date_to, flat_name)
-                g.write_note2(date_from, date_from, flat_name, "")
-                logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
+                try:
+                    g.unmerge_cells2(date_from, date_to, flat_name)
+                    g.write_note2(date_from, date_to, flat_name, "")
+                    logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
+
+                except Exception as ex:
+                    logging.warning(f"Could not unmerge and remove the note: {ex}")
+
+                # Remove the "Booked" in the Google Sheet and replace with 4 nights by default
+                try:
+                    dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
+                    dat = []
+                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, 4))
+                    g.batch_write_to_cell(data=dat)
+                except Exception as ex:
+                    logging.warning(f"Could not write to sheet: {ex}")
 
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the cancellation: {ke}")
@@ -499,6 +527,17 @@ def send_check_in_instructions(recipient_email: str, message: str):
         logging.info(f"Email sent to {recipient_email} with response: {response.status_code}")
     except Exception as e:
         logging.error(f"Email ERROR with response: {e}")
+
+
+def add_write_snippet(booking_date, google, data, flat, value):
+    cell_range = google.get_pricing_range(unit_id=flat, date1=booking_date, col=secrets["flats"][flat]["pricing_col"])
+    snippet = {
+        "range": cell_range,
+        "values": [
+            [value]
+        ]
+    }
+    data.append(snippet)
 
 
 if __name__ == '__main__':

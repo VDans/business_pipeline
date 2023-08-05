@@ -11,18 +11,30 @@ from sendgrid.helpers.mail import Mail
 from google_api import Google
 
 
+def add_write_snippet(booking_date, google, data, flat, value):
+    cell_range = google.get_pricing_range(unit_id=flat, date1=booking_date, col=secrets["flats"][flat]["pricing_col"])
+    snippet = {
+        "range": cell_range,
+        "values": [
+            [value]
+        ]
+    }
+    data.append(snippet)
+
+
 logging.basicConfig(level=logging.INFO)
 secrets = json.load(open('config_secrets.json'))
+z = Zodomus(secrets)
+g = Google(secrets=secrets, workbook_id="17c7HeZQtNGJgTaE6xUaSYFI1wkPqvnxwzLqFLXRNXps")
 
+date_from = pd.Timestamp(day=21, month=4, year=2024)
+date_to = pd.Timestamp(day=24, month=4, year=2024)
+flat_name = 'LORY22'
+value = "Matthias"
 
-message = Mail(
-    from_email='office@host-it.at',
-    to_emails='v.dans@outlook.be',
-    subject='Sending with Twilio SendGrid is Fun',
-    html_content='<strong>and easy to do anywhere, even with Python</strong>')
-try:
-    sg = SendGridAPIClient(api_key=secrets["twilio"]["email_api_key"])
-    response = sg.send(message)
-    print(response.status_code)
-except Exception as e:
-    print(e.message)
+dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
+
+dat = []
+dates_range.apply(add_write_snippet, args=(g, dat, flat_name, value))
+g.batch_write_to_cell(data=dat)
+print("")
