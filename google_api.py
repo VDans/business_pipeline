@@ -139,6 +139,7 @@ class Google:
                                    n_col_end=end_col_excl,
                                    note=note,
                                    internal_sheet_id=internal_sheet_id)
+        self.logger.info(f"Note response: {response}")
         return response
 
     def batch_write_notes(self, requests: list):
@@ -193,6 +194,8 @@ class Google:
                                     n_col_start=start_col_incl,
                                     n_col_end=end_col_excl,
                                     internal_sheet_id=internal_sheet_id)
+        self.logger.info(f"Merge response: {response}")
+
         return response
 
     def unmerge_cells2(self, date_from: pd.Timestamp, date_to: pd.Timestamp, flat_name: str, offset=45075):

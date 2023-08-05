@@ -20,12 +20,12 @@ class Zodomus:
 
 	def custom_api_call(self, method, call_url, payload):
 		"""Use when in need of additional custom API empty calls on the Zodomus server"""
-		self.logger.info(f"Sending empty payload to {method} {call_url}")
+		# self.logger.info(f"Sending empty payload to {method} {call_url}")
 		response = requests.request(auth=self.auth,
-									method=method,
-									url=f"{self.url}{call_url}",
-									headers=self.headers,
-									data=payload)
+		                            method=method,
+		                            url=f"{self.url}{call_url}",
+		                            headers=self.headers,
+		                            data=payload)
 		return response
 
 	def set_availability(self, channel_id: str, unit_id_z: str, room_id_z: str, date_from: pd.Timestamp, date_to: pd.Timestamp, availability: int):
@@ -38,12 +38,13 @@ class Zodomus:
 			"dateTo": date_to.strftime("%Y-%m-%d"),
 			"availability": availability
 		})
-		self.logger.info(f"Sending payload {payload} to POST /availability")
+		# self.logger.info(f"Sending payload {payload} to POST /availability")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/availability",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/availability",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 		return response
 
 	def check_availability(self, unit_id_z: str, channel_id: str, date_from: pd.Timestamp, date_to: pd.Timestamp):
@@ -54,21 +55,21 @@ class Zodomus:
 			"dateFrom": date_from.strftime("%Y-%m-%d"),
 			"dateTo": date_to.strftime("%Y-%m-%d")
 		})
-		self.logger.info(f"Sending payload {payload} to GET /availability")
+		# self.logger.info(f"Sending payload {payload} to GET /availability")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/availability",
-									headers=self.headers,
-									data=payload)
+		                            method="GET",
+		                            url=f"{self.url}/availability",
+		                            headers=self.headers,
+		                            data=payload)
 		return response
 
 	def get_channels(self):
 		"""Get available channels"""
-		self.logger.info(f"Sending empty payload to GET /channels")
+		# self.logger.info(f"Sending empty payload to GET /channels")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/channels",
-									headers=self.headers)
+		                            method="GET",
+		                            url=f"{self.url}/channels",
+		                            headers=self.headers)
 
 		return response
 
@@ -79,12 +80,12 @@ class Zodomus:
 			"propertyId": unit_id_z,
 			"priceModelId": price_model
 		})
-		self.logger.info(f"Sending payload {payload} to POST /property-activation")
+		# self.logger.info(f"Sending payload {payload} to POST /property-activation")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/property-activation",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/property-activation",
+		                            headers=self.headers,
+		                            data=payload)
 
 		return response
 
@@ -94,12 +95,13 @@ class Zodomus:
 			"channelId": channel_id,
 			"propertyId": unit_id_z
 		})
-		self.logger.info(f"Sending payload {payload} to POST /property-check")
+		# self.logger.info(f"Sending payload {payload} to POST /property-check")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/property-check",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/property-check",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 
 		return response
 
@@ -120,12 +122,12 @@ class Zodomus:
 				}
 			]
 		})
-		self.logger.info(f"Sending payload {payload} to POST /rooms-activation")
+		# self.logger.info(f"Sending payload {payload} to POST /rooms-activation")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/rooms-activation",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/rooms-activation",
+		                            headers=self.headers,
+		                            data=payload)
 
 		return response
 
@@ -135,12 +137,12 @@ class Zodomus:
 			"channelId": channel_id,
 			"propertyId": unit_id_z
 		})
-		self.logger.info(f"Sending payload {payload} to GET /room-rates")
+		# self.logger.info(f"Sending payload {payload} to GET /room-rates")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/room-rates",
-									headers=self.headers,
-									data=payload)
+		                            method="GET",
+		                            url=f"{self.url}/room-rates",
+		                            headers=self.headers,
+		                            data=payload)
 
 		return response
 
@@ -162,12 +164,13 @@ class Zodomus:
 				"price": price
 			}
 		})
-		self.logger.info(f"Sending payload {payload} to POST /rates")
+		# self.logger.info(f"Sending payload {payload} to POST /rates")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/rates",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/rates",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 
 		return response
 
@@ -190,12 +193,13 @@ class Zodomus:
 			},
 			"minimumStay": min_nights
 		})
-		self.logger.info(f"Sending HEAVY payload {payload} to POST /rates")
+		# self.logger.info(f"Sending HEAVY payload {payload} to POST /rates")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/rates",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/rates",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 
 		return response
 
@@ -214,26 +218,15 @@ class Zodomus:
 			"rateId": rate_id_z,
 			"minimumStay": min_nights
 		})
-		self.logger.info(f"Sending payload {payload} to POST /rates")
+		# self.logger.info(f"Sending payload {payload} to POST /rates")
 		response = requests.request(auth=self.auth,
-									method="POST",
-									url=f"{self.url}/rates",
-									headers=self.headers,
-									data=payload)
+		                            method="POST",
+		                            url=f"{self.url}/rates",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 
 		return response
-
-	def set_rate_range(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_price_min_nights: pd.DataFrame, currency: str = "EUR"):
-		"""
-		"set_rate()" for uploading different prices.
-		Airbnb should not get too many calls at the same time, therefore includes a sleep function.
-		"""
-		for row in date_price_min_nights:
-			time.sleep(0.1)
-			d = row["date"]
-			p = row["price"]
-			m_n = row["min_nights"]
-			self.set_rate(channel_id, unit_id_z, room_id_z, rate_id_z, d, p, currency)
 
 	def get_reservations_summary(self, channel_id, unit_id_z):
 		"""Overview of reservations"""
@@ -241,12 +234,12 @@ class Zodomus:
 			"channelId": channel_id,
 			"propertyId": unit_id_z
 		})
-		self.logger.info(f"Sending payload {payload} to GET /reservations-summary")
+		# self.logger.info(f"Sending payload {payload} to GET /reservations-summary")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/reservations-summary",
-									headers=self.headers,
-									data=payload)
+		                            method="GET",
+		                            url=f"{self.url}/reservations-summary",
+		                            headers=self.headers,
+		                            data=payload)
 
 		return response
 
@@ -256,12 +249,12 @@ class Zodomus:
 			"channelId": channel_id,
 			"propertyId": unit_id_z
 		})
-		self.logger.info(f"Sending payload {payload} to GET /reservations-queue")
+		# self.logger.info(f"Sending payload {payload} to GET /reservations-queue")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/reservations-queue",
-									headers=self.headers,
-									data=payload)
+		                            method="GET",
+		                            url=f"{self.url}/reservations-queue",
+		                            headers=self.headers,
+		                            data=payload)
 
 		return response
 
@@ -272,11 +265,11 @@ class Zodomus:
 			"propertyId": unit_id_z,
 			"reservationId": reservation_number
 		})
-		self.logger.info(f"Sending payload {payload} to GET /reservations")
+		# self.logger.info(f"Sending payload {payload} to GET /reservations")
 		response = requests.request(auth=self.auth,
-									method="GET",
-									url=f"{self.url}/reservations",
-									headers=self.headers,
-									data=payload)
-
+		                            method="GET",
+		                            url=f"{self.url}/reservations",
+		                            headers=self.headers,
+		                            data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 		return response

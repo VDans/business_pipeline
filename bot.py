@@ -29,8 +29,8 @@ def manage_availability():
     3. Using the dates and property retrieved in (.2), close dates using the API call.
     """
     data = request.json
-    logging.info("------------------------------------------------------------------------------------------------\n")
-    logging.info("AVAILABILITY New Request-------------------------------------------------------------------------------------\n")
+    logging.info("------------------------------------------------------------------------------------------------")
+    logging.info("AVAILABILITY New Request------------------------------------------------------------------------")
 
     try:
         reservation_status_z = data["reservationStatus"]
@@ -40,7 +40,6 @@ def manage_availability():
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_booking"] == data["propertyId"]][0]
             else:
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]][0]
-            logging.info(f"Retrieved the flat name: {flat_name}")
 
         except Exception as e:
             flat_name = "UNKNOWN"
@@ -67,7 +66,7 @@ def manage_availability():
             # Upload the reservation data to the DB:
             try:
                 dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=reservation_z)
-                logging.info("Reservation uploaded to table -bookings-")
+                logging.info("Reservation data uploaded to table -bookings-")
             except Exception as e:
                 logging.error(f"Could NOT upload the new reservation to DB: {e}")
 
@@ -96,16 +95,14 @@ def manage_availability():
                 n_guests = -1
 
             try:
-                merge_response = g.merge_cells2(date_from, date_to, flat_name)
-                logging.info(f"Merge response: {merge_response}")
+                g.merge_cells2(date_from, date_to, flat_name)
             except Exception as ex:
                 logging.error(f"Could not merge cells! Exception: {ex}")
 
             try:
                 cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                 total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                note_response = g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
-                logging.info(f"Note response: {note_response}")
+                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
             except Exception as ex:
                 logging.error(f"Could not write note! Exception: {ex}")
 
@@ -127,7 +124,7 @@ def manage_availability():
 
                 # Upload NEW reservation data to DB
                 dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=response)
-                logging.info("Reservation uploaded to table -bookings-")
+                logging.info('Reservation uploaded to table "bookings"')
 
                 # Get OLD dates, and open them:
                 old_dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE status = 'Modified' AND booking_id = '{data['reservationId']}'")
@@ -165,8 +162,7 @@ def manage_availability():
                 try:
                     cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=response, flat_name=flat_name)
                     total_price = float(response["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    note_response = g.write_note2(new_date_from, new_date_from, flat_name, f"""{response["reservations"]["customer"]["firstName"].title()} {response["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
-                    logging.info(f"Note response: {note_response}")
+                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{response["reservations"]["customer"]["firstName"].title()} {response["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
                 except Exception as ex:
                     logging.error(f"Could not write note! Exception: {ex}")
 
@@ -226,8 +222,8 @@ def get_prices():
     This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
     """
     data = request.json
-    logging.info("--------------------------------------------------------------------------------------------------------\n")
-    logging.info("PRICING New Request-------------------------------------------------------------------------------------\n")
+    logging.info("--------------------------------------------------------------------------------------------------------")
+    logging.info("PRICING New Request-------------------------------------------------------------------------------------")
 
     z = Zodomus(secrets=secrets)
 
@@ -256,26 +252,22 @@ def get_prices():
 
             # Pushing data through Zodomus:
             if data["value_type"] == "Price":
+                logging.info(f"Modifying price: Pushing to channels")
                 response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
-                logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
                 response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
-                logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
 
             elif data["value_type"] == "Min.":
                 if str(value) == "0":
                     # 3. If min_nights = 0: Close the room for the night in both channels
                     logging.info("Min. Nights set to 0. Closing the room.")
-                    response3 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
-                    logging.info(f"Booking response: {response3.json()['status']['returnMessage']}")
-                    response4 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
-                    logging.info(f"Airbnb response: {response4.json()['status']['returnMessage']}")
+                    z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
+                    z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
 
                 else:
+                    logging.info(f"Making sure availability is open before pushing min. nights value")
                     # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
-                    response0 = z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
-                    logging.info(f"Booking response: {response0.json()['status']['returnMessage']}")
-                    response0 = z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
-                    logging.info(f"Airbnb response: {response0.json()['status']['returnMessage']}")
+                    z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
+                    z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
 
                     # 2. Change the minimum nights on the platforms
                     # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
@@ -286,10 +278,9 @@ def get_prices():
                         right_cell_value = 500
                         logging.warning(f"No price is available! Setting price to 500 while waiting for a better price: {ex}")
 
-                    response1 = z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
-                    logging.info(f"Booking response: {response1.json()['status']['returnMessage']}")
-                    response2 = z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
-                    logging.info(f"Airbnb response: {response2.json()['status']['returnMessage']}")
+                    logging.info(f"Pushing min. nights value")
+                    z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
+                    z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
 
             else:
                 response1 = response2 = "value_type data not one of 'Price' or 'Min.'"
@@ -311,8 +302,8 @@ def check_in_online():
     This call also triggers the expedition of the check-in instructions to the
     """
     data = request.json
-    logging.info("------------------------------------------------------------------------------------------------\n")
-    logging.info("OCI New Request-------------------------------------------------------------------------------------\n")
+    logging.info("------------------------------------------------------------------------------------------------")
+    logging.info("OCI New Request---------------------------------------------------------------------------------")
 
     fa = data["form_response"]["answers"]
     logging.info(f"New online check-in submitted. Uploading to DB...")
@@ -400,7 +391,7 @@ def check_in_online():
         eta = eta_json[0]["text"]
     except Exception as e:
         eta = None
-        logging.error(f"Could not find eta with error: {e}")
+        logging.error(f"Could not find ETA with error: {e}")
 
     try:
         beds_json = list(filter(lambda x: x["field"]["id"] == "dGapMiuCAuWX", fa))
