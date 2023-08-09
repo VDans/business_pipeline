@@ -1,11 +1,12 @@
-import json
 import logging
-import pandas as pd
+import json
 from datetime import datetime
-from google_api import Google
-from zodomus_api import Zodomus
+
+import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
+from zodomus_api import Zodomus
+from google_api import Google
 
 logging.basicConfig(level=logging.INFO)
 pd.options.mode.chained_assignment = None

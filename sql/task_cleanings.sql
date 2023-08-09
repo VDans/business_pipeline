@@ -1,12 +1,18 @@
 SELECT
-    bookings.object,
-    bookings.reservation_end,
-    bookings.adults + bookings.children as n_guests
+    a.object,
+    a.reservation_end,
+    a.adults + a.children AS n_guests,
+    COALESCE(b.eta, 'Nicht gesagt') as eta,
+    COALESCE(b.beds, 'Nicht gesagt') as beds
 FROM
-    bookings
+    bookings a
+LEFT JOIN
+    checkin_data b
+ON
+    a.booking_id = b.booking_id
 WHERE
-    status = 'OK'
-AND reservation_end >= CURRENT_DATE
-AND reservation_end <= CURRENT_DATE + 31
+    a.status = 'OK'
+AND a.reservation_end >= CURRENT_DATE
+AND a.reservation_end <= CURRENT_DATE + 31
 ORDER BY
-    reservation_end;
+    a.reservation_end

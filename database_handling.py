@@ -13,12 +13,18 @@ class DatabaseHandler:
     def upload_reservation(self, channel_id_z, flat_name, reservation_z):
         logging.info(f"Starting reservation upload")
         out = self.clean_reservation_z(channel_id_z, flat_name, reservation_z)
-        out.to_sql(
-            index=False,
-            con=self.db_engine,
-            name='bookings',
-            if_exists='append'
-        )
+
+        # Check if the booking_id is already in the DB with the status 'OK':
+        duplicate = self.query_data(f"SELECT booking_id FROM bookings WHERE status = 'OK' AND booking_id = '{reservation_z['reservations']['reservation']['id']}'")
+        if len(duplicate["booking_id"]) == 0:
+            out.to_sql(
+                index=False,
+                con=self.db_engine,
+                name='bookings',
+                if_exists='append'
+            )
+        else:
+            logging.warning(f"This booking_id is already on the DB with status OK!")
 
     def clean_reservation_z(self, channel_id_z, flat_name, reservation_z):
         data = reservation_z["reservations"]
@@ -118,7 +124,7 @@ class DatabaseHandler:
 
         # Thread ID (Airbnb):
         try:
-            if channel_id_z == "3":
+            if str(channel_id_z) == "3":
                 thread_id = reservation_z["fullResponse"]["threadId"]
             else:
                 logging.info(f"Could not find thread_id because this is a Booking.com reservation.")
