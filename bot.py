@@ -32,6 +32,8 @@ def manage_availability():
     logging.info("------------------------------------------------------------------------------------------------")
     logging.info("AVAILABILITY New Request------------------------------------------------------------------------")
 
+    logging.info(f"Payload: \n{json.dumps(request.json(), indent=3)}")
+
     try:
         reservation_status_z = data["reservationStatus"]
         logging.info(f"Retrieved the reservationStatus: {reservation_status_z}")
@@ -40,12 +42,10 @@ def manage_availability():
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_booking"] == data["propertyId"]][0]
             else:
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]][0]
-
         except Exception as e:
             flat_name = "UNKNOWN"
             logging.error(f"Could NOT retrieve the flat name because of your shitty minimalistic logic: {e}")
 
-        # flat_name = secrets["flat_names"][data["propertyId"]]  # Flat common name
         channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
         z = Zodomus(secrets=secrets)
@@ -53,15 +53,19 @@ def manage_availability():
         db_engine = create_engine(url=secrets["database"]["url"])
         dbh = DatabaseHandler(db_engine, secrets)
 
+        # Find the reservation
+        reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
+        logging.info("Retrieved reservation data")
+
         # Initiate bookings table
         tbl = Table("bookings", MetaData(), autoload_with=db_engine)
 
         if reservation_status_z == '1':  # New
-            logging.info(f"New booking in {flat_name}")
+            # Exception at GBS... If other exceptions appear, change pid/rid logic.
+            if (flat_name == "GBS") and (channel_name == "Booking"):
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
 
-            # Get the reservation data from Zodomus:
-            reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
-            logging.info("Retrieved reservation data")
+            logging.info(f"New booking in {flat_name}")
 
             # Upload the reservation data to the DB:
             try:
@@ -113,13 +117,13 @@ def manage_availability():
             logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
 
         elif reservation_status_z == '2':  # Modified
+            # Exception at GBS... If other exceptions appear, change pid/rid logic.
+            if (flat_name == "GBS") and (channel_name == "Booking"):
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
+
             logging.info(f"Modified booking in {flat_name}")
 
             try:
-                # Get NEW reservation data:
-                response = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
-                logging.info("Retrieved reservation data")
-
                 # Update OLD reservation data DB status to 'Modified'
                 upd = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Modified")
                 with db_engine.begin() as conn:
@@ -127,7 +131,7 @@ def manage_availability():
                     logging.info(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")
 
                 # Upload NEW reservation data to DB
-                dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=response)
+                dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=reservation_z)
                 logging.info('Reservation uploaded to table "bookings"')
 
                 # Get OLD dates, and open them:
@@ -139,8 +143,8 @@ def manage_availability():
                 logging.info("Old dates have been opened in both channels")
 
                 # Get NEW dates, and close them:
-                new_date_from = pd.Timestamp(response["reservations"]["rooms"][0]["arrivalDate"])
-                new_date_to = pd.Timestamp(response["reservations"]["rooms"][0]["departureDate"])
+                new_date_from = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["arrivalDate"])
+                new_date_to = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["departureDate"])
                 z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=new_date_from, date_to=new_date_to, availability=0)
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
                 logging.info("New dates have been closed in both channels")
@@ -164,7 +168,7 @@ def manage_availability():
                 logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
 
                 # Write the "Booked" in the Google Sheet
-                n_guests = get_n_guests(response)
+                n_guests = get_n_guests(reservation_z)
 
                 try:
                     dates_range = pd.Series(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
@@ -181,9 +185,9 @@ def manage_availability():
                     logging.error(f"Could not merge cells with exception: {ex}")
 
                 try:
-                    cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=response, flat_name=flat_name)
-                    total_price = float(response["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{response["reservations"]["customer"]["firstName"].title()} {response["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
+                    cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
+                    total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
+                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
                 except Exception as ex:
                     logging.error(f"Could not write note! Exception: {ex}")
 
@@ -194,6 +198,10 @@ def manage_availability():
                 # body = f"ERROR: Could not process modification"
 
         elif reservation_status_z == '3':  # Cancelled
+            # Exception at GBS... If other exceptions appear, change pid/rid logic.
+            if (flat_name == "GBS") and (channel_name == "Booking"):
+                flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
+
             logging.info(f"Cancelled booking in {flat_name}")
 
             try:

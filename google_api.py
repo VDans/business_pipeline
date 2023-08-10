@@ -81,6 +81,15 @@ class Google:
 
         return response
 
+    def batch_clear_range(self, cell_ranges: list):
+        """Clear several Google Sheet cell ranges"""
+        response = self.service_sheet.spreadsheets().values().batchClear(
+            spreadsheetId=self.workbook_id,
+            body=cell_ranges
+        ).execute()
+
+        return response
+
     def get_pricing_range(self, unit_id: str, date1: datetime, col: str = None, offset: int = 45075):
         """This function returns the row number within the pricing sheet, on which the given date is found."""
 
@@ -144,6 +153,29 @@ class Google:
 
     def batch_write_notes(self, requests: list):
         """Add many notes at once"""
+        response = self.service_sheet.spreadsheets().batchUpdate(
+
+            spreadsheetId=self.workbook_id,
+            body={
+                "requests": requests
+            }
+        ).execute()
+
+        return response
+
+    def batch_request(self, requests: list):
+        """Request many things at once"""
+        response = self.service_sheet.spreadsheets().batchUpdate(
+            spreadsheetId=self.workbook_id,
+            body={
+                "requests": requests
+            }
+        ).execute()
+
+        return response
+
+    def batch_unmerge(self, requests: list):
+        """Unmerge many cells at once"""
         response = self.service_sheet.spreadsheets().batchUpdate(
             spreadsheetId=self.workbook_id,
             body={

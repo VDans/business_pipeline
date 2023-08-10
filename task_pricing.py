@@ -124,9 +124,7 @@ def check_minimum_nights():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    # sql = open("sql/task_pricing.sql").read()
-    # bookings = dbh.query_data(sql=sql)
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
+    flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
 
     for flat in flats:
         logging.info(f"----- Processing minimum nights in flat {flat}")

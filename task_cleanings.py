@@ -30,7 +30,7 @@ def write_cleanings():
     bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_end": pd.Timestamp})
     quota = 0
 
-    flats = list(bookings["object"].unique())
+    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
     cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
     for cs in cleaning_sheets:
         dat = []
