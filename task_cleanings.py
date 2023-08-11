@@ -27,7 +27,7 @@ def write_cleanings():
 
     """
     sql = open("sql/task_cleanings.sql").read()
-    bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_end": pd.Timestamp})
+    bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_start": pd.Timestamp})
     quota = 0
 
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
@@ -54,9 +54,9 @@ def write_cleanings():
             logging.info(f"Processing cleanings in flat {flat}")
 
             # Shift the n_guests, eta and for each flat:
-            b['n_guests'] = b['n_guests'].shift(-1, fill_value=-1)
-            b['eta'] = b['eta'].shift(-1, fill_value="Nicht gesagt")
-            b['beds'] = b['beds'].shift(-1, fill_value="Nicht gesagt")
+            # b['n_guests'] = b['n_guests'].shift(-1, fill_value=-1)
+            # b['eta'] = b['eta'].shift(-1, fill_value="Nicht gesagt")
+            # b['beds'] = b['beds'].shift(-1, fill_value="Nicht gesagt")
 
             # Prepare the batchRequest: for each reservation end, create a batch snippet, append it to the data dict.
             b.apply(add_data_snippet, axis=1, args=(dat, flat, g))
@@ -72,7 +72,7 @@ def write_cleanings():
 
 
 def add_data_snippet(booking, data, flat, google):
-    cell_range = google.get_pricing_range(unit_id=flat, date1=booking["reservation_end"], col=secrets["flats"][flat]["cleaning_col"], offset=45106)
+    cell_range = google.get_pricing_range(unit_id=flat, date1=booking["reservation_start"], col=secrets["flats"][flat]["cleaning_col"], offset=45106)
     snippet = {
         "range": cell_range,
         "values": [
@@ -89,8 +89,8 @@ def add_notes_snippet(booking, notes, flat, google, offset=45106):
         "updateCells": {
             "range": {
                 "sheetId": 0,
-                "startRowIndex": google.excel_date(booking["reservation_end"]) - offset - 1,
-                "endRowIndex": google.excel_date(booking["reservation_end"]) - offset,
+                "startRowIndex": google.excel_date(booking["reservation_start"]) - offset - 1,
+                "endRowIndex": google.excel_date(booking["reservation_start"]) - offset,
                 "startColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]),
                 "endColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]) + 1
             },

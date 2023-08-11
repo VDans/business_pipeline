@@ -24,11 +24,11 @@ def write_notes():
 
     # Get list of flats
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-    # flats = ["LORY22"]
 
     # Clear workbook:
     g.write_note(0, 998, 0, 100, "", 920578163)
     g.unmerge_cells(0, 999, 0, 100, 920578163)
+
     dat = []
     merg = []
     # colors = []

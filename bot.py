@@ -32,8 +32,6 @@ def manage_availability():
     logging.info("------------------------------------------------------------------------------------------------")
     logging.info("AVAILABILITY New Request------------------------------------------------------------------------")
 
-    logging.info(f"Payload: \n{json.dumps(request.json(), indent=3)}")
-
     try:
         reservation_status_z = data["reservationStatus"]
         logging.info(f"Retrieved the reservationStatus: {reservation_status_z}")

@@ -6,6 +6,6 @@ FROM
     bookings
 WHERE
     status = 'OK'
-AND reservation_start > CURRENT_DATE
+AND reservation_start >= CURRENT_DATE
 ORDER BY
     reservation_start;
