@@ -96,9 +96,7 @@ class AirbnbCom:
 
         if image_path:
             # The image upload input tag is hidden!
-
-            wait = WebDriverWait(self.driver, 50)
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".i9gn8a input[type=file]")))
-            # elements = self.driver.find_elements(By.CSS_SELECTOR, ".file-upload-input input[type=file]")
-            # .send_keys('C:\\Users\\Desktop\\test.png')
+            time.sleep(2)
+            uploadBtn = self.driver.find_element(By.CLASS_NAME, 'c12qnhp2')
+            uploadBtn.send_keys("G:/My Drive/BLOCH/step3.jpg")
             print("")

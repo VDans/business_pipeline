@@ -1,5 +1,7 @@
 import json
 import logging
+import time
+
 import pandas as pd
 from flask import Flask, request
 from sendgrid import SendGridAPIClient
@@ -28,6 +30,7 @@ def manage_availability():
     2. GET /reservations with the reservation number from the webhook
     3. Using the dates and property retrieved in (.2), close dates using the API call.
     """
+    start_time = time.time()  # Checking the length of each request
     data = request.json
     logging.info("------------------------------------------------------------------------------------------------")
     logging.info("AVAILABILITY New Request------------------------------------------------------------------------")
@@ -58,12 +61,14 @@ def manage_availability():
         # Initiate bookings table
         tbl = Table("bookings", MetaData(), autoload_with=db_engine)
 
+        logging.info(f"Step 1 finishes at timestamp {time.time() - start_time} seconds.")
+
         if reservation_status_z == '1':  # New
             # Exception at GBS... If other exceptions appear, change pid/rid logic.
             if (flat_name == "GBS") and (channel_name == "Booking"):
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
 
-            logging.info(f"New booking in {flat_name}")
+            logging.info(f"New booking in {flat_name} from {reservation_z['reservations']['rooms'][0]['arrivalDate']} to {reservation_z['reservations']['rooms'][0]['departureDate']}")
 
             # Upload the reservation data to the DB:
             try:
@@ -81,16 +86,24 @@ def manage_availability():
             z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
             logging.info("Availability has been closed in both channels")
 
+            logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
+
             # In the Google Pricing Sheet:
-            # Write the channel:
+            # Write the name of the guest:
+            try:
+                part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title() + "."
+            except IndexError as ie:
+                part2 = ""
+            short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
             try:
                 dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
                 dat = []
-                dates_range.apply(add_write_snippet, args=(g, dat, flat_name, channel_name))
+                dates_range.apply(add_write_snippet, args=(g, dat, flat_name, short_name))
                 g.batch_write_to_cell(data=dat)
 
             except Exception as ex:
                 logging.warning(f"Could not write to sheet: {ex}")
+            logging.info(f"Step 3 finishes at timestamp {time.time() - start_time} seconds.")
 
             # Merge the cells based on the first one:
             try:
@@ -104,15 +117,17 @@ def manage_availability():
                 g.merge_cells2(date_from, date_to, flat_name)
             except Exception as ex:
                 logging.error(f"Could not merge cells with exception: {ex}")
+            logging.info(f"Step 4 finishes at timestamp {time.time() - start_time} seconds.")
 
             try:
                 cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                 total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
+                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""")
             except Exception as ex:
                 logging.error(f"Could not write note! Exception: {ex}")
 
             logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
+            logging.info(f"Step 5 finishes at timestamp {time.time() - start_time} seconds.")
 
         elif reservation_status_z == '2':  # Modified
             # Exception at GBS... If other exceptions appear, change pid/rid logic.
@@ -147,6 +162,8 @@ def manage_availability():
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
                 logging.info("New dates have been closed in both channels")
 
+                logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
+
                 # Unmerge the cells based on the first one:
                 try:
                     g.unmerge_cells2(old_date_from, old_date_to, flat_name)
@@ -169,9 +186,15 @@ def manage_availability():
                 n_guests = get_n_guests(reservation_z)
 
                 try:
+                    # Write the name of the guest:
+                    try:
+                        part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title() + "."
+                    except IndexError as ie:
+                        part2 = ""
+                    short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
                     dates_range = pd.Series(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
                     dat = []
-                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, channel_name))
+                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, short_name))
                     g.batch_write_to_cell(data=dat)
 
                 except Exception as ex:
@@ -247,6 +270,9 @@ def manage_availability():
         logging.error(f"Couldn't find the 'ReservationStatus' in the request: {e}")
         logging.info(f"The request says: {data}")
 
+    end_time = time.time()
+    logging.info(f"This call lasted {end_time - start_time} seconds")
+
     return str("All Good!")
 
 
@@ -255,6 +281,8 @@ def get_prices():
     """
     This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
     """
+    start_time = time.time()
+
     data = request.json
     logging.info("--------------------------------------------------------------------------------------------------------")
     logging.info("PRICING New Request-------------------------------------------------------------------------------------")
@@ -326,6 +354,9 @@ def get_prices():
             else:
                 logging.warning(f"Value {data['new_value'][i][0]} entered is not a valid input. Skipping the logic: {ve}")
 
+    end_time = time.time()
+    logging.info(f"This took {end_time - start_time} seconds")
+
     return str("Thanks Google!")
 
 
@@ -335,6 +366,8 @@ def check_in_online():
     Receive webhook from TypeForm Website with needed data.
     This call also triggers the expedition of the check-in instructions to the
     """
+    start_time = time.time()
+
     data = request.json
     logging.info("------------------------------------------------------------------------------------------------")
     logging.info("OCI New Request---------------------------------------------------------------------------------")
@@ -501,6 +534,9 @@ def check_in_online():
         logging.error(f"Could NOT even reach the querying using this booking_id: {e}")
 
     dbh.close_engine()
+
+    end_time = time.time()
+    logging.info(f"This took {end_time - start_time} seconds")
 
     return str("Thanks for checking in!")
 

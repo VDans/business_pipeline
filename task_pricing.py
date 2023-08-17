@@ -10,7 +10,7 @@ from google_api import Google
 
 
 logger = logging.getLogger("mylogger")
-logger.warning("HEY!")
+logger.info(f"Logger starting")
 logging.basicConfig()
 
 pd.options.mode.chained_assignment = None
@@ -31,7 +31,7 @@ def check_prices():
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
-
+    # flats = ["SCH21"]
     for flat in flats:
         logger.warning(f"----- Processing prices in flat {flat}")
 
@@ -46,7 +46,7 @@ def check_prices():
         min_gsheet_min = [str(n[0]) if len(n) > 0 else "Booked" for n in min_gsheet[1]["values"]]
         min_gsheet = list(zip(min_gsheet_dates, min_gsheet_min))
         # Filter where open & not booked & > Today
-        min_gsheet = [n for n in min_gsheet if n[1] not in ["Booking", "Airbnb", "Booked", "0"]]
+        min_gsheet = [n for n in min_gsheet if any(char.isdigit() for char in n[1])]
         min_gsheet = [n for n in min_gsheet if n[0] >= pd.Timestamp.today()]
         min_gsheet_dates = [m[0] for m in min_gsheet]
 
@@ -95,6 +95,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
     init_date = prices_gsheet[0][0]
     price_z = []
     for i in range(13):
+        logger.warning(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
@@ -111,6 +112,13 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
         p_g = int(d[1])
         pz = [m for m in price_z if m[0] == date][0]
         p_z = int(float(pz[1]))
+
+        if p_g < 30:
+            logger.warning(f"PRICE TOO LOW: {date} - Price {p_g} detected on the Google Sheet. Setting price at 30, not lower")
+            # Google is too low. Setting to 30.
+            response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=30).json()
+            logger.warning(f"Pushed new price 30 to {channel_name} with response: {response['status']['returnMessage']}")
+
         if p_g != p_z:
             logger.warning(f"DELTA: {date}: {p_g} vs {p_z}")
             # Google is the absolute truth
@@ -129,7 +137,7 @@ def check_minimum_nights():
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-
+    # flats = ["SCH21"]
     for flat in flats:
         logger.warning(f"----- Processing minimum nights in flat {flat}")
 
@@ -144,7 +152,7 @@ def check_minimum_nights():
         min_gsheet_min = [str(n[0]) if len(n) > 0 else "Booked" for n in min_gsheet[1]["values"]]
         min_gsheet = list(zip(min_gsheet_dates, min_gsheet_min))
         # Filter where open & not booked & > Today
-        min_gsheet = [n for n in min_gsheet if n[1] not in ["Booking", "Airbnb", "Booked", "0"]]
+        min_gsheet = [n for n in min_gsheet if any(char.isdigit() for char in n[1])]
         min_gsheet = [n for n in min_gsheet if n[0] >= pd.Timestamp.today()]
 
         # 2a) Zodomus GET min. nights from BOOKING
@@ -179,6 +187,7 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
     init_date = min_gsheet[0][0]
     min_z = []
     for i in range(13):
+        logger.warning(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
@@ -194,7 +203,7 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
         date = d[0]
         m_night_g = int(d[1])
         mz = [m for m in min_z if m[0] == date][0]
-        m_night_z = 1 if mz[1] == "0" else int(mz[1])
+        m_night_z = 1 if mz[1] == "0" else int(mz[1])  # A response with min nights of '0' means there is no minimum, therefore a 'one night' minimum.
         if m_night_g != m_night_z:
             logger.warning(f"DELTA: {date}: {m_night_g} vs {m_night_z}")
 
@@ -213,5 +222,5 @@ def from_excel_ordinal(ordinal: float, _epoch0=datetime(1899, 12, 31)) -> dateti
     return (_epoch0 + pd.Timedelta(days=ordinal)).replace(microsecond=0)
 
 
-check_minimum_nights()
 check_prices()
+check_minimum_nights()

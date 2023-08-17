@@ -24,7 +24,7 @@ def write_notes():
 
     # Get list of flats
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-
+    # flats = ['G124']
     # Clear workbook:
     g.write_note(0, 998, 0, 100, "", 920578163)
     g.unmerge_cells(0, 999, 0, 100, 920578163)
@@ -35,9 +35,9 @@ def write_notes():
     notes = []
 
     for flat in flats:
-        logging.info(f"Processing notes in flat {flat}")
+        logging.warning(f"Processing notes in flat {flat}")
 
-        logging.info(f"Cleared worksheet of values and notes.")
+        logging.warning(f"Cleared worksheet of values and notes.")
 
         # Filter the bookings:
         b = bookings[bookings["object"] == flat]
@@ -58,15 +58,21 @@ def write_notes():
     # Merge booking cells
     g.batch_request(requests=merg)
 
-    logging.info("Processed all notes for this flat.")
+    logging.warning("Processed all notes for this flat.")
 
 
 def add_write_snippet(booking, data, flat, google, internal_sheet_id, offset=45075):
     cell_range = google.get_pricing_range(unit_id=flat, date1=booking["reservation_start"], col=secrets["flats"][flat]["pricing_col"], offset=offset)
+    part1 = booking["guest_name"].split(" ")[0].title()
+    try:
+        part2 = booking["guest_name"].split(" ")[1][0].title() + "."
+    except IndexError as ie:
+        part2 = ""
+    shortened_name = f"""{part1} {part2}"""
     snippet = {
         "range": cell_range,
         "values": [
-            [booking["platform"]]
+            [f"""{shortened_name} ({booking["platform"][0]})"""]
         ]
     }
     data.append(snippet)
