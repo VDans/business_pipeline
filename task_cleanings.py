@@ -1,14 +1,13 @@
 import logging
 import json
 import time
-import string
 import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
 
 from google_api import Google
 
-logging.basicConfig(level=logging.warning)
+logging.basicConfig(level=logging.INFO)
 pd.options.mode.chained_assignment = None
 
 secrets = json.load(open('config_secrets.json'))
@@ -32,6 +31,9 @@ def write_cleanings():
 
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
     cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
+
+    logging.warning(f"The time right now is: {time.time()}")
+
     for cs in cleaning_sheets:
         dat = []
         notes = []
@@ -42,7 +44,7 @@ def write_cleanings():
         # Clear workbook:
         response = g.clear_range(cell_range="B2:Z1000")
         # Clear notes: Make a large batch with notes to "":
-        response1 = g.write_note(0, 998, 0, 24, "", 0)
+        response1 = g.write_note(0, 900, 0, 50, "", 0)
         logging.warning(f"Cleared worksheet of values and notes.")
 
         # Find all flats on this workbook:
@@ -72,7 +74,7 @@ def write_cleanings():
 
 
 def add_data_snippet(booking, data, flat, google):
-    cell_range = google.get_pricing_range(unit_id=flat, date1=booking["reservation_start"], col=secrets["flats"][flat]["cleaning_col"], offset=45106)
+    cell_range = google.get_rolling_range(unit_id=flat, date1=booking["reservation_start"], headers_rows=2, col=secrets["flats"][flat]["cleaning_col"])
     snippet = {
         "range": cell_range,
         "values": [
@@ -82,15 +84,19 @@ def add_data_snippet(booking, data, flat, google):
     data.append(snippet)
 
 
-def add_notes_snippet(booking, notes, flat, google, offset=45106):
+def add_notes_snippet(booking, notes, flat, google, headers_rows: int = 2):
+    # Compute the ROLLING offset, based on today - 15 - headers_row:
+    offset_exact = google.excel_date(booking["reservation_start"])
+    offset_first = google.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15))
+    row = int(offset_exact - offset_first) + headers_rows  # Adjusting to the title rows where there's no date
     note_body = f"""- ANKUNFT -\n{booking['eta']}\n\n- WÜNSCHE -\n{booking['beds']}"""
 
     snippet = {
         "updateCells": {
             "range": {
                 "sheetId": 0,
-                "startRowIndex": google.excel_date(booking["reservation_start"]) - offset - 1,
-                "endRowIndex": google.excel_date(booking["reservation_start"]) - offset,
+                "startRowIndex": row - 1,  # -1 bc rows start excl.
+                "endRowIndex": row,
                 "startColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]),
                 "endColumnIndex": google.col2num(secrets["flats"][flat]["cleaning_col"]) + 1
             },

@@ -61,6 +61,21 @@ class Google:
 
         return response
 
+    def write_table_to_cell(self, cell_range_start: str, values: list, sheet_name="Data!"):
+        """Modify the content of a specific cell range"""
+        response = self.service_sheet.spreadsheets().values().update(
+            spreadsheetId=self.workbook_id,
+            valueInputOption="USER_ENTERED",
+            range=sheet_name + cell_range_start,
+            body={
+                "majorDimension": "ROWS",
+                "values": values
+            }
+        ).execute()
+        self.logger.info(f"Wrote {values} to cell {cell_range_start}")
+
+        return response
+
     def batch_write_to_cell(self, data):
         response = self.service_sheet.spreadsheets().values().batchUpdate(
             spreadsheetId=self.workbook_id,
@@ -94,6 +109,21 @@ class Google:
         """This function returns the row number within the pricing sheet, on which the given date is found."""
 
         row = int(self.excel_date(date1) - offset)  # The first date in the pricing range is the 1st of June (45078), BUT dates only start from row 3.
+        if not col:
+            col = self.secrets["flats"][unit_id]["pricing_col"]
+        sheet_range = col + str(row)
+
+        return sheet_range
+
+    def get_rolling_range(self, unit_id: str, date1: datetime, headers_rows: int, col: str = None, timedelta_days: int = 15):
+        """
+        This function returns the row number within the pricing sheet, on which the given date is found.
+        The sheet's starting date is today() - 15 days! --> "Rolling Range"
+        headers_rows denominates the number of rows to offset to counter the column titles.
+        """
+        offset_exact = self.excel_date(date1)
+        offset_first = self.excel_date(pd.Timestamp.today() - pd.Timedelta(days=timedelta_days))  # Adjusting to today's date - 15 days (Rolling Window)
+        row = int(offset_exact - offset_first) + headers_rows  # Adjusting to the title rows where there's no date
         if not col:
             col = self.secrets["flats"][unit_id]["pricing_col"]
         sheet_range = col + str(row)

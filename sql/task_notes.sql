@@ -11,6 +11,6 @@ FROM
     bookings a left join public.bookings_kpis b on a.booking_id = b.booking_id
 WHERE
     status = 'OK'
-    AND reservation_start >= '2023-06-01'
+    AND reservation_start >= CURRENT_DATE - 14
 ORDER BY
     reservation_start;

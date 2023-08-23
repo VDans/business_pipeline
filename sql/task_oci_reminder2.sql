@@ -20,7 +20,7 @@ AND a.object IN
         FROM
             messages)
 AND a.reservation_start >= CURRENT_DATE
-AND a.reservation_start = CURRENT_DATE + 3
+AND a.reservation_start < CURRENT_DATE + 3
 AND b.complete_name IS NULL
 ORDER BY
     2;

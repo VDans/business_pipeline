@@ -98,5 +98,6 @@ class AirbnbCom:
             # The image upload input tag is hidden!
             time.sleep(2)
             uploadBtn = self.driver.find_element(By.CLASS_NAME, 'c12qnhp2')
-            uploadBtn.send_keys("G:/My Drive/BLOCH/step3.jpg")
+            uploadBtn.click()
+            uploadBtn.send_keys(image_path)
             print("")

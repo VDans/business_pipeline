@@ -111,6 +111,7 @@ class DatabaseHandler:
         # Phone
         try:
             phone = data["customer"]["phone"].replace(" ", "")
+            phone = "+" + phone if "+" not in phone else phone
         except Exception as ex:
             phone = None
             logging.error(f"Could not find phone with exception: {ex}")

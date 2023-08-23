@@ -3,7 +3,7 @@ import logging
 import time
 
 import pandas as pd
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
@@ -53,6 +53,7 @@ def manage_availability():
         g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
         db_engine = create_engine(url=secrets["database"]["url"])
         dbh = DatabaseHandler(db_engine, secrets)
+        offset = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15)) - 3  # Rolling window. -3 for 3 headers rows!
 
         # Find the reservation
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
@@ -91,8 +92,9 @@ def manage_availability():
             # In the Google Pricing Sheet:
             # Write the name of the guest:
             try:
-                part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title() + "."
+                part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
             except IndexError as ie:
+                logging.error(f"ERROR: {ie}")
                 part2 = ""
             short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
             try:
@@ -105,7 +107,7 @@ def manage_availability():
                 logging.warning(f"Could not write to sheet: {ex}")
             logging.info(f"Step 3 finishes at timestamp {time.time() - start_time} seconds.")
 
-            # Merge the cells based on the first one:
+            # Get n_guests
             try:
                 n_guests = get_n_guests(reservation_z)
                 logging.info(f"There are {n_guests} guests.")
@@ -113,8 +115,9 @@ def manage_availability():
                 logging.warning(f"Couldn't obtain number of guests: {e}")
                 n_guests = -1
 
+            # Merge the cells based on the first one:
             try:
-                g.merge_cells2(date_from, date_to, flat_name)
+                g.merge_cells2(date_from, date_to, flat_name, offset)
             except Exception as ex:
                 logging.error(f"Could not merge cells with exception: {ex}")
             logging.info(f"Step 4 finishes at timestamp {time.time() - start_time} seconds.")
@@ -122,7 +125,7 @@ def manage_availability():
             try:
                 cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                 total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""")
+                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""", offset=offset)
             except Exception as ex:
                 logging.error(f"Could not write note! Exception: {ex}")
 
@@ -166,8 +169,8 @@ def manage_availability():
 
                 # Unmerge the cells based on the first one:
                 try:
-                    g.unmerge_cells2(old_date_from, old_date_to, flat_name)
-                    g.write_note2(old_date_from, old_date_from, flat_name, "")
+                    g.unmerge_cells2(old_date_from, old_date_to, flat_name, offset=offset)
+                    g.write_note2(old_date_from, old_date_from, flat_name, "", offset=offset)
                 except Exception as ex:
                     logging.warning(f"Could not unmerge and remove the note: {ex}")
 
@@ -201,14 +204,14 @@ def manage_availability():
                     logging.warning(f"Could not write to sheet: {ex}")
 
                 try:
-                    g.merge_cells2(new_date_from, new_date_to, flat_name)
+                    g.merge_cells2(new_date_from, new_date_to, flat_name, offset=offset)
                 except Exception as ex:
                     logging.error(f"Could not merge cells with exception: {ex}")
 
                 try:
                     cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                     total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""")
+                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""", offset=offset)
                 except Exception as ex:
                     logging.error(f"Could not write note! Exception: {ex}")
 
@@ -241,8 +244,8 @@ def manage_availability():
 
                 # Unmerge the cells based on the first one:
                 try:
-                    g.unmerge_cells2(date_from, date_to, flat_name)
-                    g.write_note2(date_from, date_to, flat_name, "")
+                    g.unmerge_cells2(date_from, date_to, flat_name, offset=offset)
+                    g.write_note2(date_from, date_to, flat_name, "", offset=offset)
                     logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
 
                 except Exception as ex:
@@ -572,7 +575,7 @@ def send_check_in_instructions(recipient_email: str, message: str):
 
 
 def add_write_snippet(booking_date, google, data, flat, value):
-    cell_range = google.get_pricing_range(unit_id=flat, date1=booking_date, col=secrets["flats"][flat]["pricing_col"])
+    cell_range = google.get_rolling_range(unit_id=flat, date1=booking_date, col=secrets["flats"][flat]["pricing_col"], headers_rows=3)
     snippet = {
         "range": cell_range,
         "values": [
