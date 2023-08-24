@@ -1,7 +1,6 @@
 import logging
 import json
 from datetime import datetime
-import time
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -19,7 +18,7 @@ pd.options.mode.chained_assignment = None
 secrets = json.load(open('config_secrets.json'))
 db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
-logging.warning(f"The time right now is: {time.time()}")
+logging.warning(f"The time right now is: {pd.Timestamp.now()}")
 
 
 def check_prices():

@@ -3,7 +3,6 @@ import json
 import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
-import time
 
 from google_api import Google
 
@@ -19,7 +18,7 @@ def write_notes():
     """
     Used when you need to correct the notes on the pricing sheet
     """
-    logging.warning(f"The time right now is: {time.time()}")
+    logging.warning(f"The time right now is: {pd.Timestamp.now()}")
 
     sql = open("sql/task_notes.sql").read()
     bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_start": pd.Timestamp, "reservation_end": pd.Timestamp})

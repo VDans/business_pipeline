@@ -211,7 +211,8 @@ def manage_availability():
                 try:
                     cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                     total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}""", offset=offset)
+                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""", offset=offset)
+
                 except Exception as ex:
                     logging.error(f"Could not write note! Exception: {ex}")
 
@@ -229,11 +230,22 @@ def manage_availability():
             logging.info(f"Cancelled booking in {flat_name}")
 
             try:
-                upd = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Cancelled")
-                with db_engine.begin() as conn:
-                    conn.execute(upd)
-                    logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+                # Set Status to Cancelled
+                upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Cancelled")
+                # Set cleaning fee to 0, and fetch the updated reservation price
+                upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(cleaning_fee=0)
+                # Set cleaning fee to 0, and fetch the updated reservation price
+                upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(nights_price=float(reservation_z['reservations']['rooms'][0]['totalPrice'].replace(",", "")))
 
+                with db_engine.begin() as conn:
+                    conn.execute(upd1)
+                    conn.execute(upd2)
+                    conn.execute(upd3)
+                    logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+                    logging.info(f"UPDATE bookings SET cleaning_fee = 0 WHERE booking_id = '{data['reservationId']}'")
+                    logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['rooms'][0]['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
+
+                # Have to get the dates from the DB because not provided by
                 dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
                 date_from = pd.Timestamp(dates["reservation_start"][0])
                 date_to = pd.Timestamp(dates["reservation_end"][0])
