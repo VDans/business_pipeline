@@ -21,6 +21,9 @@ def send_sms(booking, c):
     Ich bin der Gastgeber für Ihr Apartment in Wien.
     Ich habe bemerkt, dass Sie meine Nachrichten auf {booking["platform"]} nicht gesehen haben.
     Daher sende ich Ihnen hier eine Erinnerung, dies Online-Check-in-Formular auszufüllen.
+    
+    Https://hostit.typeform.com/online-checkin
+    
     Ihre Buchungsnummer lautet: {booking["booking_id"]}
     Sobald dies geschehen ist, werden Sie auf {booking["platform"]} genaue Anweisungen erhalten, wie Sie Ihre Wohnung betreten können.
     Einen schönen Tag noch!"""
@@ -29,7 +32,10 @@ def send_sms(booking, c):
                 f"""Hello!
     This is the host for your apartment in Vienna.
     We noticed that you have not seen our messages on {booking["platform"]}.
-    Therefore, we send you here a reminder to fill our online check-in form.
+    Therefore, we send you here a reminder to fill our online check-in form:
+    
+    Https://hostit.typeform.com/online-checkin
+ 
     Your booking number is: {booking["booking_id"]}
     Once this is done, you will receive precise instructions on {booking["platform"]} on how to enter your flat.
     Have a good day!"""

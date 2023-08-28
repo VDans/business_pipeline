@@ -126,7 +126,8 @@ def add_notes_snippet(booking, notes, flat, google, internal_sheet_id, headers_r
     offset_first = google.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15))
     row = int(offset_exact - offset_first) + headers_rows  # Adjusting to the title rows where there's no date
 
-    note_body = f"""{booking["guest_name"].title()}\nPaid {booking["total_amount_paid_by_guest"]}€\nGuests: {booking["n_guests"]}\nID: {booking["booking_id"]}"""
+    duration = (booking["reservation_end"] - booking["reservation_start"]).days
+    note_body = f"""{booking["guest_name"].title()}\nPaid {booking["total_amount_paid_by_guest"]}€\nGuests: {booking["n_guests"]}\nNights: {duration}\nFrom {booking["reservation_start"].strftime("%d.%m")} To {booking["reservation_end"].strftime("%d.%m")}\nID: {booking["booking_id"]}"""
 
     snippet = {
         "updateCells": {
@@ -170,6 +171,7 @@ def add_merge_snippet(booking, merg, flat, google, internal_sheet_id, headers_ro
             "mergeType": "MERGE_ALL"
         }
     }
+    logging.warning(f"Merge Snippet: {snippet}")
     merg.append(snippet)
 
 

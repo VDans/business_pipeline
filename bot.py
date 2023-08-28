@@ -40,12 +40,12 @@ def manage_availability():
         logging.info(f"Retrieved the reservationStatus: {reservation_status_z}")
         try:
             if str(data["channelId"]) == '1':
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_booking"] == data["propertyId"]][0]
+                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["pid_booking"] == data["propertyId"]) or (data["propertyId"] in secrets["flats"][fn]["older_pid"])][0]
             else:
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]][0]
+                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]) or (data["propertyId"] in secrets["flats"][fn]["older_pid"])][0]
         except Exception as e:
             flat_name = "UNKNOWN"
-            logging.error(f"Could NOT retrieve the flat name because of your shitty minimalistic logic: {e}")
+            logging.error(f"Could NOT retrieve the flat name: {e}")
 
         channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
@@ -125,7 +125,9 @@ def manage_availability():
             try:
                 cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                 total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                g.write_note2(date_from, date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""", offset=offset)
+                duration = (date_to - date_from).days
+                note = f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nNights: {duration}\nFrom {date_from.strftime("%d.%m")} To {date_to.strftime("%d.%m")}\nID: {data["reservationId"]}"""
+                g.write_note2(date_from, date_from, flat_name, note=note, offset=offset)
             except Exception as ex:
                 logging.error(f"Could not write note! Exception: {ex}")
 
@@ -211,7 +213,9 @@ def manage_availability():
                 try:
                     cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
                     total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    g.write_note2(new_date_from, new_date_from, flat_name, f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nID: {data["reservationId"]}""", offset=offset)
+                    duration = (new_date_to - new_date_from).days
+                    note = f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nNights: {duration}\nFrom {new_date_from.strftime("%d.%m")} To {new_date_to.strftime("%d.%m")}\nID: {data["reservationId"]}"""
+                    g.write_note2(new_date_from, new_date_from, flat_name, note=note, offset=offset)
 
                 except Exception as ex:
                     logging.error(f"Could not write note! Exception: {ex}")
@@ -232,18 +236,23 @@ def manage_availability():
             try:
                 # Set Status to Cancelled
                 upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Cancelled")
-                # Set cleaning fee to 0, and fetch the updated reservation price
-                upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(cleaning_fee=0)
-                # Set cleaning fee to 0, and fetch the updated reservation price
-                upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(nights_price=float(reservation_z['reservations']['rooms'][0]['totalPrice'].replace(",", "")))
+                # Set cleaning fee to 0
+                upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(cleaning=0)
+                # Fetch the updated reservation price
+                upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(nights_price=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")))
+                # Update the platform commission
+                r_com = -0.15 if str(data["channelId"]) == '3' else -0.162
+                upd4 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(commission_host=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")) * r_com)
 
                 with db_engine.begin() as conn:
                     conn.execute(upd1)
-                    conn.execute(upd2)
-                    conn.execute(upd3)
                     logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
-                    logging.info(f"UPDATE bookings SET cleaning_fee = 0 WHERE booking_id = '{data['reservationId']}'")
-                    logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['rooms'][0]['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
+                    conn.execute(upd2)
+                    logging.info(f"UPDATE bookings SET cleaning = 0 WHERE booking_id = '{data['reservationId']}'")
+                    conn.execute(upd3)
+                    logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['reservation']['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
+                    conn.execute(upd4)
+                    logging.info(f"UPDATE bookings SET commission_host = 15% nets WHERE booking_id = '{data['reservationId']}'")
 
                 # Have to get the dates from the DB because not provided by
                 dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
@@ -274,7 +283,6 @@ def manage_availability():
 
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the cancellation: {ke}")
-                # body = f"ERROR: Could not process cancellation"
 
         else:
             logging.error(f"reservationStatus not understood: {reservation_status_z}")
