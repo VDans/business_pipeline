@@ -9,16 +9,14 @@ from zodomus_api import Zodomus
 from google_api import Google
 
 
-logger = logging.getLogger("mylogger")
-logger.info(f"Logger starting")
-logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 pd.options.mode.chained_assignment = None
 
 secrets = json.load(open('config_secrets.json'))
 db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
-logging.warning(f"The time right now is: {pd.Timestamp.now()}")
+logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
 
 def check_prices():
@@ -34,7 +32,7 @@ def check_prices():
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
     # flats = ["SCH21"]
     for flat in flats:
-        logger.warning(f"----- Processing prices in flat {flat}")
+        logging.info(f"----- Processing prices in flat {flat}")
 
         # 1a) Google Sheet Data: Min nights provide an indication of which rows needs to be watched!
         pricing_col = secrets["flats"][flat]["pricing_col"]
@@ -71,10 +69,10 @@ def check_prices():
             try:
                 adjust_prices(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], prices_gsheet=prices_gsheet)
             except Exception as ex:
-                logger.error(f"ERROR: Could not process Booking.com with exception: {ex}")
+                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
 
         else:
-            logger.warning(f"Property NOT active on Booking.com. SKIPPING")
+            logging.info(f"Property NOT active on Booking.com. SKIPPING")
 
         # 2b) Zodomus GET min. nights from AIRBNB
         p_check = z.check_property(channel_id="3", unit_id_z=secrets["flats"][flat]["pid_airbnb"]).json()
@@ -82,21 +80,21 @@ def check_prices():
             try:
                 adjust_prices(z=z, channel_id_z="3", unit_id_z=secrets["flats"][flat]["pid_airbnb"], room_id_z=secrets["flats"][flat]["rid_airbnb"], rate_id_z=secrets["flats"][flat]["rtid_airbnb"], prices_gsheet=prices_gsheet)
             except Exception as ex:
-                logger.error(f"ERROR: Could not process Airbnb with exception: {ex}")
+                logging.error(f"ERROR: Could not process Airbnb with exception: {ex}")
 
         else:
-            logger.warning(f"Property NOT active on Airbnb. SKIPPING")
+            logging.info(f"Property NOT active on Airbnb. SKIPPING")
 
 
 def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_z: str, prices_gsheet):
     channel_name = "Booking.com" if channel_id_z == '1' else "Airbnb"
 
-    logger.warning(f"--- Getting availabilities from {channel_name}...")
+    logging.info(f"--- Getting availabilities from {channel_name}...")
     # The API only allows for 30 days rates check.
     init_date = prices_gsheet[0][0]
     price_z = []
     for i in range(13):
-        logger.warning(f"Init Date: {init_date}")
+        logging.info(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
@@ -107,7 +105,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
     prices_gsheet = [m1 for m1 in prices_gsheet if m1[0] in [m2[0] for m2 in price_z]]
 
     # Compare 1) and 2)
-    logger.warning(f"- Comparing the Google Sheet and {channel_name}...")
+    logging.info(f"- Comparing the Google Sheet and {channel_name}...")
     for d in prices_gsheet:
         date = d[0]
         p_g = int(d[1])
@@ -115,16 +113,16 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
         p_z = int(float(pz[1]))
 
         if p_g < 30:
-            logger.warning(f"PRICE TOO LOW: {date} - Price {p_g} detected on the Google Sheet. Setting price at 30, not lower")
+            logging.info(f"PRICE TOO LOW: {date} - Price {p_g} detected on the Google Sheet. Setting price at 30, not lower")
             # Google is too low. Setting to 30.
             response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=30).json()
-            logger.warning(f"Pushed new price 30 to {channel_name} with response: {response['status']['returnMessage']}")
+            logging.info(f"Pushed new price 30 to {channel_name} with response: {response['status']['returnMessage']}")
 
         if p_g != p_z:
-            logger.warning(f"DELTA: {date}: {p_g} vs {p_z}")
+            logging.info(f"DELTA: {date}: {p_g} vs {p_z}")
             # Google is the absolute truth
             response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=p_g).json()
-            logger.warning(f"Pushed new price {p_g} to {channel_name} with response: {response['status']['returnMessage']}")
+            logging.info(f"Pushed new price {p_g} to {channel_name} with response: {response['status']['returnMessage']}")
 
 
 def check_minimum_nights():
@@ -140,7 +138,7 @@ def check_minimum_nights():
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
     # flats = ["SCH21"]
     for flat in flats:
-        logger.warning(f"----- Processing minimum nights in flat {flat}")
+        logging.info(f"----- Processing minimum nights in flat {flat}")
 
         # 1) Google Sheet Data
         pricing_col = secrets["flats"][flat]["pricing_col"]
@@ -163,10 +161,10 @@ def check_minimum_nights():
             try:
                 adjust_min_nights(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], min_gsheet=min_gsheet)
             except Exception as ex:
-                logger.error(f"ERROR: Could not process Booking.com with exception: {ex}")
+                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
 
         else:
-            logger.warning(f"Property NOT active on Booking.com. SKIPPING")
+            logging.info(f"Property NOT active on Booking.com. SKIPPING")
 
         # 2b) Zodomus GET min. nights from AIRBNB
         p_check = z.check_property(channel_id="3", unit_id_z=secrets["flats"][flat]["pid_airbnb"]).json()
@@ -174,21 +172,21 @@ def check_minimum_nights():
             try:
                 adjust_min_nights(z=z, channel_id_z="3", unit_id_z=secrets["flats"][flat]["pid_airbnb"], room_id_z=secrets["flats"][flat]["rid_airbnb"], rate_id_z=secrets["flats"][flat]["rtid_airbnb"], min_gsheet=min_gsheet)
             except Exception as ex:
-                logger.error(f"ERROR: Could not process Airbnb with exception: {ex}")
+                logging.error(f"ERROR: Could not process Airbnb with exception: {ex}")
 
         else:
-            logger.warning(f"Property NOT active on Airbnb. SKIPPING")
+            logging.info(f"Property NOT active on Airbnb. SKIPPING")
 
 
 def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_z: str, min_gsheet):
     channel_name = "Booking.com" if channel_id_z == '1' else "Airbnb"
 
-    logger.warning(f"Getting availabilities from {channel_name}...")
+    logging.info(f"Getting availabilities from {channel_name}...")
     # The API only allows for 30 days rates check.
     init_date = min_gsheet[0][0]
     min_z = []
     for i in range(13):
-        logger.warning(f"Init Date: {init_date}")
+        logging.info(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
@@ -199,14 +197,14 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
     min_gsheet = [m1 for m1 in min_gsheet if m1[0] in [m2[0] for m2 in min_z]]
 
     # Compare 1) and 2)
-    logger.warning(f"Comparing the Google Sheet and {channel_name}...")
+    logging.info(f"Comparing the Google Sheet and {channel_name}...")
     for d in min_gsheet:
         date = d[0]
         m_night_g = int(d[1])
         mz = [m for m in min_z if m[0] == date][0]
         m_night_z = 1 if mz[1] == "0" else int(mz[1])  # A response with min nights of '0' means there is no minimum, therefore a 'one night' minimum.
         if m_night_g != m_night_z:
-            logger.warning(f"DELTA: {date}: {m_night_g} vs {m_night_z}")
+            logging.info(f"DELTA: {date}: {m_night_g} vs {m_night_z}")
 
             # Google is the absolute truth
             if channel_id_z == "1":
@@ -214,7 +212,7 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
             else:
                 response = z.set_airbnb_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, min_nights=m_night_g, price=1000).json()
 
-            logger.warning(f"Pushed new Min. {m_night_g} to {channel_name} with response: {response['status']['returnMessage']}")
+            logging.info(f"Pushed new Min. {m_night_g} to {channel_name} with response: {response['status']['returnMessage']}")
 
 
 def from_excel_ordinal(ordinal: float, _epoch0=datetime(1899, 12, 31)) -> datetime:

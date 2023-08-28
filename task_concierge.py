@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
 from zodomus_api import Zodomus
 
-logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 pd.options.mode.chained_assignment = None
 
 secrets = json.load(open('config_secrets.json'))
@@ -19,11 +19,11 @@ def close_dates_z(booking, z, flat, s):
     time.sleep(1)
     if s["flats"][flat]["pid_booking"] != "":
         response = z.set_availability(channel_id="1", unit_id_z=s["flats"][flat]["pid_booking"], room_id_z=s["flats"][flat]["rid_booking"], date_from=booking["reservation_start"], date_to=booking["reservation_end"], availability=0)
-        logging.warning(f"Closed {flat} on Booking.com from {booking['reservation_start']} to {booking['reservation_end']} with response: {response.json()['status']['returnMessage']}")
+        logging.info(f"Closed {flat} on Booking.com from {booking['reservation_start']} to {booking['reservation_end']} with response: {response.json()['status']['returnMessage']}")
 
     if s["flats"][flat]["pid_airbnb"] != "":
         response1 = z.set_availability(channel_id="3", unit_id_z=s["flats"][flat]["pid_airbnb"], room_id_z=s["flats"][flat]["rid_airbnb"], date_from=booking["reservation_start"], date_to=booking["reservation_end"] + pd.Timedelta(days=-1), availability=0)
-        logging.warning(f"Closed {flat} on Airbnb from {booking['reservation_start']} to {booking['reservation_end']} with response: {response1.json()['status']['returnMessage']}")
+        logging.info(f"Closed {flat} on Airbnb from {booking['reservation_start']} to {booking['reservation_end']} with response: {response1.json()['status']['returnMessage']}")
 
 
 def check_bookings():
@@ -39,17 +39,16 @@ def check_bookings():
 
     # Get list of flats
     flats = list(bookings["object"].unique())
-    # flats = ["BLOCH"]
     z = Zodomus(secrets=secrets)
 
     for flat in flats:
-        logging.warning(f"Processing bookings in flat {flat}")
+        logging.info(f"Processing bookings in flat {flat}")
         b = bookings[bookings["object"] == flat]
 
         # For each booking (list of timestamps), send a POST request to close the dates:
         b.apply(close_dates_z, axis=1, args=(z, flat, secrets))
 
-    logging.warning("Ran the concierge successfully")
+    logging.info("Ran the concierge successfully")
 
 
 check_bookings()

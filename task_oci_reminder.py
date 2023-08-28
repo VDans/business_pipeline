@@ -8,13 +8,13 @@ from database_handling import DatabaseHandler
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
-logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 pd.options.mode.chained_assignment = None
 
 
 def send_sms(booking, c):
     try:
-        logging.warning(f"Sending SMS to {booking['phone']}")
+        logging.info(f"Sending SMS to {booking['phone']}")
         if booking["phone"][:3] in ["+43", "+49"]:
             message_body = \
                 f"""Hallo!
@@ -53,7 +53,7 @@ def send_sms(booking, c):
 
 
 def send_sms_manager(booking, s):
-    logging.warning(f"Sending email to valen@live.be")
+    logging.info(f"Sending email to valen@live.be")
     guests = ""
     for i in range(len(booking["phone"])):
         guests += f"<p>{booking['guest_name'][i]} - {booking['reservation_start'][i].strftime('%Y-%m-%d')} - {booking['booking_id'][i]} - {booking['phone'][i]}</p>"
@@ -90,7 +90,7 @@ def remind_guest():
     # Get bookings in exactly 3 days
     sql = open("sql/task_oci_reminder.sql").read()
     bookings_3days = dbh.query_data(sql=sql, dtypes={"reservation_start": pd.Timestamp})
-    logging.warning(f"{len(bookings_3days['phone'])} guest/s have not filled the online check-in and arrive in 3 days.")
+    logging.info(f"{len(bookings_3days['phone'])} guest/s have not filled the online check-in and arrive in 3 days.")
 
     # For each booking (list of timestamps), send a POST request to close the dates:
     bookings_3days.apply(send_sms, axis=1, args=(client,))
@@ -113,7 +113,7 @@ def remind_manager():
     # Get bookings in exactly 3 days
     sql = open("sql/task_oci_reminder2.sql").read()
     bookings_2days = dbh.query_data(sql=sql, dtypes={"reservation_start": pd.Timestamp})
-    logging.warning(f"{len(bookings_2days['phone'])} guest/s have not filled the online check-in and arrive in < 3 days.")
+    logging.info(f"{len(bookings_2days['phone'])} guest/s have not filled the online check-in and arrive in < 3 days.")
 
     # For each booking (list of timestamps), send a POST request to close the dates:
     send_sms_manager(bookings_2days, secrets)

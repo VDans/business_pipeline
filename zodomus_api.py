@@ -101,7 +101,7 @@ class Zodomus:
 									url=f"{self.url}/property-check",
 									headers=self.headers,
 									data=payload)
-		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
+		# self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 
 		return response
 
