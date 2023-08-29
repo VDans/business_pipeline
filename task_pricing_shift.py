@@ -21,7 +21,7 @@ def shift_sheet():
     """
     logging.warning(f"The time right now is: {pd.Timestamp.now()}")
 
-    g = Google(secrets, secrets["google"]["test_pricing_workbook_id"])
+    g = Google(secrets, secrets["google"]["pricing_workbook_id"])
     sheet_id = 920578163
     
     # /1

@@ -29,8 +29,8 @@ def check_prices():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
-    # flats = ["SCH21"]
+    # flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
+    flats = ["CZERNIN"]
     for flat in flats:
         logging.info(f"----- Processing prices in flat {flat}")
 
@@ -47,6 +47,8 @@ def check_prices():
         # Filter where open & not booked & > Today
         min_gsheet = [n for n in min_gsheet if any(char.isdigit() for char in n[1])]
         min_gsheet = [n for n in min_gsheet if n[0] >= pd.Timestamp.today()]
+        min_gsheet = [n for n in min_gsheet if str(n[1]) != '0']  # Take out the 0's. The night is closed.
+
         min_gsheet_dates = [m[0] for m in min_gsheet]
 
         # 1b) Google Sheet Prices Collecting:
@@ -153,6 +155,7 @@ def check_minimum_nights():
         # Filter where open & not booked & > Today
         min_gsheet = [n for n in min_gsheet if any(char.isdigit() for char in n[1])]
         min_gsheet = [n for n in min_gsheet if n[0] >= pd.Timestamp.today()]
+        min_gsheet = [n for n in min_gsheet if str(n[1]) != '0']  # Take out the 0's. The night is closed.
 
         # 2a) Zodomus GET min. nights from BOOKING
         # First check if property on booking:

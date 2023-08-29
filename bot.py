@@ -504,6 +504,9 @@ def check_in_online():
         "booking_id": [booking_id]
     })
 
+    logging.info(f"Checking if this combination of booking_id and complete name is already on the database...")
+    dbh.query_data(sql=f"SELECT * FROM checkin_data WHERE booking_id = '{booking_id}' AND complete_name = '{complete_name}';")
+
     out.to_sql(name="checkin_data",
                con=db_engine,
                if_exists="append",

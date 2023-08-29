@@ -22,7 +22,7 @@ class Notes:
     
         sql = open("sql/task_notes.sql").read()
         bookings = self.dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_start": pd.Timestamp, "reservation_end": pd.Timestamp})
-        g = Google(secrets=self.secrets, workbook_id=self.secrets["google"]["test_pricing_workbook_id"])
+        g = Google(secrets=self.secrets, workbook_id=self.secrets["google"]["pricing_workbook_id"])
 
         # Get list of flats
         flats = [f[0] for f in self.secrets["flats"].items() if f[1]["pricing_col"] != ""]
