@@ -29,8 +29,8 @@ def check_prices():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    # flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
-    flats = ["CZERNIN"]
+    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
+    # flats = ["G125"]
     for flat in flats:
         logging.info(f"----- Processing prices in flat {flat}")
 
@@ -138,7 +138,7 @@ def check_minimum_nights():
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-    # flats = ["SCH21"]
+    # flats = ["G125"]
     for flat in flats:
         logging.info(f"----- Processing minimum nights in flat {flat}")
 

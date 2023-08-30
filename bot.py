@@ -3,7 +3,7 @@ import logging
 import time
 
 import pandas as pd
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
@@ -193,7 +193,7 @@ def manage_availability():
                 try:
                     # Write the name of the guest:
                     try:
-                        part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title() + "."
+                        part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
                     except IndexError as ie:
                         part2 = ""
                     short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
