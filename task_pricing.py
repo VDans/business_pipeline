@@ -30,7 +30,6 @@ def check_prices():
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
-    # flats = ["G125"]
     for flat in flats:
         logging.info(f"----- Processing prices in flat {flat}")
 
@@ -138,7 +137,6 @@ def check_minimum_nights():
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-    # flats = ["G125"]
     for flat in flats:
         logging.info(f"----- Processing minimum nights in flat {flat}")
 
@@ -224,5 +222,5 @@ def from_excel_ordinal(ordinal: float, _epoch0=datetime(1899, 12, 31)) -> dateti
     return (_epoch0 + pd.Timedelta(days=ordinal)).replace(microsecond=0)
 
 
-check_prices()
 check_minimum_nights()
+check_prices()

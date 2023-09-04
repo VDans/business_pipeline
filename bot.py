@@ -7,6 +7,7 @@ from flask import Flask, request
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import create_engine, Table, MetaData, update
 from database_handling import DatabaseHandler
 from zodomus_api import Zodomus
@@ -232,27 +233,39 @@ def manage_availability():
                 flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
 
             logging.info(f"Cancelled booking in {flat_name}")
-
             try:
-                # Set Status to Cancelled
-                upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Cancelled")
-                # Set cleaning fee to 0
-                upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(cleaning=0)
-                # Fetch the updated reservation price
-                upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(nights_price=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")))
-                # Update the platform commission
-                r_com = -0.15 if str(data["channelId"]) == '3' else -0.162
-                upd4 = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(commission_host=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")) * r_com)
-
                 with db_engine.begin() as conn:
-                    conn.execute(upd1)
-                    logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
-                    conn.execute(upd2)
-                    logging.info(f"UPDATE bookings SET cleaning = 0 WHERE booking_id = '{data['reservationId']}'")
-                    conn.execute(upd3)
-                    logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['reservation']['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
-                    conn.execute(upd4)
-                    logging.info(f"UPDATE bookings SET commission_host = 15% nets WHERE booking_id = '{data['reservationId']}'")
+                    try:
+                        # Set Status to Cancelled
+                        upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(status="Cancelled")
+                        conn.execute(upd1)
+                        logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+                    except Exception as ex:
+                        logging.error(f"Couldn't update status: {ex}")
+
+                    try:
+                        # Set cleaning fee to 0
+                        upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(cleaning=0)
+                        conn.execute(upd2)
+                        logging.info(f"UPDATE bookings SET cleaning = 0 WHERE booking_id = '{data['reservationId']}'")
+                    except Exception as ex:
+                        logging.error(f"Couldn't update cleaning fee: {ex}")
+
+                    try:
+                        # Fetch the updated reservation price
+                        upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(nights_price=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")))
+                        # Update the platform commission
+                        r_com = -0.15 if str(data["channelId"]) == '3' else -0.162
+                        upd4 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(commission_host=float(reservation_z['reservations']['reservation']['totalPrice'].replace(",", "")) * r_com)
+                    except Exception as ex:
+                        upd3 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(nights_price=0)
+                        upd4 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(commission_host=0)
+                        logging.error(f"Couldn't update prices: {ex}")
+                    finally:
+                        conn.execute(upd3)
+                        logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['reservation']['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
+                        conn.execute(upd4)
+                        logging.info(f"UPDATE bookings SET commission_host = 15% nets WHERE booking_id = '{data['reservationId']}'")
 
                 # Have to get the dates from the DB because not provided by
                 dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
@@ -507,10 +520,13 @@ def check_in_online():
     logging.info(f"Checking if this combination of booking_id and complete name is already on the database...")
     dbh.query_data(sql=f"SELECT * FROM checkin_data WHERE booking_id = '{booking_id}' AND complete_name = '{complete_name}';")
 
-    out.to_sql(name="checkin_data",
-               con=db_engine,
-               if_exists="append",
-               index=False)
+    try:
+        out.to_sql(name="checkin_data",
+                   con=db_engine,
+                   if_exists="append",
+                   index=False)
+    except IntegrityError as ie:
+        logging.error(f"A duplicate has been found, and the new data was not uploaded: {ie}")
 
     logging.info(f"Data uploaded to the DB with success: {complete_name}")
 
