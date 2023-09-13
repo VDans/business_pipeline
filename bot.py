@@ -625,4 +625,4 @@ def add_write_snippet(booking_date, google, data, flat, value):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

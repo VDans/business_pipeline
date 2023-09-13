@@ -1,7 +1,7 @@
 SELECT
     a.object,
     a.reservation_start,
-     CASE
+    CASE
         WHEN a.reservation_end >= CURRENT_DATE - 15
         AND a.reservation_start <= CURRENT_DATE - 15
         THEN CURRENT_DATE - 15
@@ -22,6 +22,6 @@ ON
 AND a.status = b.status
 WHERE
     a.status = 'OK'
-AND a.reservation_end >= CURRENT_DATE - 15
+AND a.reservation_end > CURRENT_DATE - 15
 ORDER BY
     a.reservation_start;
