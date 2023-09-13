@@ -104,6 +104,7 @@ def update_notes_cohosts():
 		g = Google(secrets=secrets, workbook_id=wbid)
 
 		# Clear workbook:
+		g.clear_range(cell_range="B3:Z1000")
 		g.write_note(0, 998, 0, 100, "", 920578163)
 		g.unmerge_cells(0, 999, 0, 100, 920578163)
 
@@ -131,5 +132,6 @@ def update_notes_cohosts():
 		g.batch_request(requests=merg)
 
 		logging.info("Processed all notes for this flat.")
+
 
 update_notes_cohosts()
