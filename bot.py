@@ -95,7 +95,7 @@ def manage_availability():
             try:
                 part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
             except IndexError as ie:
-                logging.error(f"ERROR: {ie}")
+                logging.warning(f"WARNING - No last name: {ie}")
                 part2 = ""
             short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
             try:
