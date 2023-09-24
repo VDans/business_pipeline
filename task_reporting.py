@@ -5,7 +5,6 @@ import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
 from google_api import Google
-from gspread_dataframe import set_with_dataframe
 
 logging.basicConfig(level=logging.INFO)
 pd.options.mode.chained_assignment = None
