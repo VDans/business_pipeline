@@ -23,7 +23,7 @@ def shift_sheet():
 
     g = Google(secrets, secrets["google"]["pricing_workbook_id"])
     sheet_id = 920578163
-    
+
     # /1
     g.write_note(0, 500, 0, 100, "", sheet_id)
     g.unmerge_cells(0, 500, 0, 100, sheet_id)

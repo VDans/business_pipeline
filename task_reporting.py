@@ -1,9 +1,11 @@
 import logging
 import json
+import gspread
 import pandas as pd
 from sqlalchemy import create_engine
 from database_handling import DatabaseHandler
 from google_api import Google
+from gspread_dataframe import set_with_dataframe
 
 logging.basicConfig(level=logging.INFO)
 pd.options.mode.chained_assignment = None
@@ -21,16 +23,15 @@ def copy_db():
 
     # 1/ Read Bookings
     sql = open("sql/task_bookings.sql").read()
-    bookings = dbh.query_data(sql=sql, dtypes={"booking_date": str, "reservation_start": str, "reservation_end": str, "phone": str})
+    bookings = dbh.query_data(sql=sql, dtypes={"booking_date": str, "reservation_start": str, "reservation_end": str, "phone": str, "end_of_month_start": str, "end_of_month_end": str})
 
     # 2/ Clear Google Sheet
-    g.clear_range(cell_range="A2:ZZ10000")
+    g.clear_range(cell_range="A1:ZZ10000")
 
     # 3/ Output to Google Sheet:
-    data = [bookings.columns.values.tolist()]
-    data.extend(bookings.values.tolist())
-
-    g.write_table_to_cell(values=data, cell_range_start="A1")
+    gc = gspread.service_account("google_secrets.json")
+    sh = gc.open_by_key(secrets["google"]["bookings_workbook_id"]).sheet1
+    sh.update([bookings.columns.values.tolist()] + bookings.values.tolist())
 
 
 copy_db()
