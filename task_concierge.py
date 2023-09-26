@@ -39,7 +39,6 @@ def check_bookings():
 
     # Get list of flats
     flats = list(bookings["object"].unique())
-
     z = Zodomus(secrets=secrets)
 
     for flat in flats:
