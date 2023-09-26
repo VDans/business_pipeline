@@ -95,7 +95,7 @@ def manage_availability():
             try:
                 part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
             except IndexError as ie:
-                logging.warning(f"WARNING - No last name: {ie}")
+                logging.error(f"ERROR: {ie}")
                 part2 = ""
             short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
             try:
@@ -581,6 +581,68 @@ def check_in_online():
     logging.info(f"This took {end_time - start_time} seconds")
 
     return str("Thanks for checking in!")
+
+
+@app.route('/code', methods=['POST'])
+def get_code():
+    """
+    This url is called by the Google Webhook when a change occurs in the Lockboxes Codes' Google Sheet.
+    """
+    start_time = time.time()
+
+    data = request.json
+    logging.info("--------------------------------------------------------------------------------------------------------")
+    logging.info("LOCKBOX CODES New Request-------------------------------------------------------------------------------------")
+
+    db_engine = create_engine(url=secrets["database"]["url"])
+    dbh = DatabaseHandler(db_engine, secrets)
+
+    tbl = Table("entry_codes", MetaData(), autoload_with=db_engine)
+
+    flat_name = data["flat_name"]
+    new_code = data["new_code"]
+    timestamp_now = pd.Timestamp.now()
+
+    try:
+        existing_flat = dbh.query_data(f"SELECT flat_name FROM entry_codes WHERE flat_name = '{flat_name}'")
+        if len(existing_flat["flat_name"]) == 0:
+            out = pd.DataFrame([{
+                "flat_name": flat_name,
+                "last_changed": timestamp_now,
+                "code": new_code
+            }])
+            logging.warning(f"Flat NOT found on the database. Adding new row with new code...")
+            out.to_sql(
+                index=False,
+                con=db_engine,
+                name='entry_codes',
+                if_exists='append'
+            )
+        else:
+            logging.warning(f"Flat found on the database. Changing code...")
+            try:
+                # Update code on DB to new code
+                upd = update(tbl).where(tbl.c.flat_name == flat_name).values(code=new_code)
+                with db_engine.begin() as conn:
+                    conn.execute(upd)
+                    logging.info(f"UPDATE entry_codes SET code = '{new_code}' WHERE flat_name = '{flat_name}'")
+            except Exception as ex:
+                logging.error(f"Could not update code on existing flat: {ex}")
+
+            try:
+                # Update Timestamp on DB to current time
+                upd = update(tbl).where(tbl.c.flat_name == flat_name).values(last_changed=timestamp_now)
+                with db_engine.begin() as conn:
+                    conn.execute(upd)
+                    logging.info(f"UPDATE entry_codes SET last_changed = '{timestamp_now}' WHERE flat_name = '{flat_name}'")
+            except Exception as ex:
+                logging.error(f"Could not update timestamp on existing flat: {ex}")
+
+    except Exception as ex:
+        logging.error(f"Could not add code: {ex}")
+
+    logging.info(f"This took {time.time() - start_time} seconds")
+    return str("Changed Code (Supposedly)")
 
 
 def get_n_guests(reservation_z):
