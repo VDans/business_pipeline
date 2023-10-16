@@ -28,8 +28,8 @@ class Notes:
         flats = [f[0] for f in self.secrets["flats"].items() if f[1]["pricing_col"] != ""]
 
         # Clear workbook:
-        g.write_note(0, 998, 0, 100, "", 920578163)
-        g.unmerge_cells(0, 999, 0, 100, 920578163)
+        g.write_note(0, 998, 0, 1000, "", 920578163)
+        g.unmerge_cells(0, 999, 0, 1000, 920578163)
 
         dat = []
         merg = []

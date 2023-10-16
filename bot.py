@@ -58,7 +58,11 @@ def manage_availability():
 
         # Find the reservation
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
-        logging.info("Retrieved reservation data")
+        if str(reservation_z['status']['returnCode']) == "400":
+            logging.warning(f"Status 400 was returned when looking up the reservation. Sending warning email.")
+            send_email(recipient_email="office@host-it.at", message=f"""Action required: Reservation not found. Data received: {data}""")
+        else:
+            logging.info("Retrieved reservation data")
 
         # Initiate bookings table
         tbl = Table("bookings", MetaData(), autoload_with=db_engine)
@@ -66,8 +70,10 @@ def manage_availability():
         logging.info(f"Step 1 finishes at timestamp {time.time() - start_time} seconds.")
 
         if reservation_status_z == '1':  # New
-            # Exception at GBS... If other exceptions appear, change pid/rid logic.
+            # Exception at GBS & BSG. If other exceptions appear, change pid/rid logic.
             if (flat_name == "GBS") and (channel_name == "Booking"):
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
+            if (flat_name == "BSG") and (channel_name == "Booking"):
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
 
             logging.info(f"New booking in {flat_name} from {reservation_z['reservations']['rooms'][0]['arrivalDate']} to {reservation_z['reservations']['rooms'][0]['departureDate']}")
@@ -138,6 +144,8 @@ def manage_availability():
         elif reservation_status_z == '2':  # Modified
             # Exception at GBS... If other exceptions appear, change pid/rid logic.
             if (flat_name == "GBS") and (channel_name == "Booking"):
+                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
+            if (flat_name == "BSG") and (channel_name == "Booking"):
                 flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
 
             logging.info(f"Modified booking in {flat_name}")
@@ -228,21 +236,15 @@ def manage_availability():
                 # body = f"ERROR: Could not process modification"
 
         elif reservation_status_z == '3':  # Cancelled
-            # Exception at GBS... If other exceptions appear, change pid/rid logic.
+            # Exception at GBS & BSG:
             if (flat_name == "GBS") and (channel_name == "Booking"):
                 flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
+            if (flat_name == "BSG") and (channel_name == "Booking"):
+                flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
 
-            logging.info(f"Cancelled booking in {flat_name}")
+            logging.info(f"Cancelled booking {str(data['reservationId'])} in {flat_name}")
             try:
                 with db_engine.begin() as conn:
-                    try:
-                        # Set Status to Cancelled
-                        upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(status="Cancelled")
-                        conn.execute(upd1)
-                        logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
-                    except Exception as ex:
-                        logging.error(f"Couldn't update status: {ex}")
-
                     try:
                         # Set cleaning fee to 0
                         upd2 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(cleaning=0)
@@ -266,6 +268,14 @@ def manage_availability():
                         logging.info(f"UPDATE bookings SET nights_price = {reservation_z['reservations']['reservation']['totalPrice']} WHERE booking_id = '{data['reservationId']}'")
                         conn.execute(upd4)
                         logging.info(f"UPDATE bookings SET commission_host = 15% nets WHERE booking_id = '{data['reservationId']}'")
+
+                    try:
+                        # Set Status to Cancelled
+                        upd1 = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(status="Cancelled")
+                        conn.execute(upd1)
+                        logging.info(f"UPDATE bookings SET status = 'Cancelled' WHERE booking_id = '{data['reservationId']}'")
+                    except Exception as ex:
+                        logging.error(f"Couldn't update status: {ex}")
 
                 # Have to get the dates from the DB because not provided by
                 dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE booking_id = '{data['reservationId']}'")
@@ -417,14 +427,14 @@ def check_in_online():
     # The first step is to identify the booking.
     try:
         booking_id_json = list(filter(lambda x: x["field"]["id"] == "aYx6wPeuUVQB", fa))
-        booking_id = booking_id_json[0]["text"]
+        booking_id = booking_id_json[0]["text"].upper()
     except Exception as e:
         booking_id = None
         logging.error(f"Could not find booking_id with error: {e}")
 
     try:
         complete_name_json = list(filter(lambda x: x["field"]["id"] == "2jL0fJRRhvIx", fa))
-        complete_name = complete_name_json[0]["text"]
+        complete_name = complete_name_json[0]["text"].title()
     except Exception as e:
         complete_name = None
         logging.error(f"Could not find Complete Name with error: {e}")
@@ -551,7 +561,7 @@ def check_in_online():
                 logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
 
                 # Send the email:
-                send_check_in_instructions(recipient_email=recipient_email, message=check_in_instructions)
+                send_email(recipient_email=recipient_email, message=check_in_instructions)
 
             else:
                 logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. Switching language...")
@@ -563,13 +573,13 @@ def check_in_online():
                     logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
 
                     # Send the email:
-                    send_check_in_instructions(recipient_email=recipient_email, message=check_in_instructions)
+                    send_email(recipient_email=recipient_email, message=check_in_instructions)
 
                 else:
                     logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. The instructions are not available in this flat...")
 
         else:
-            send_check_in_instructions(recipient_email="office@host-it.at", message=f"The guest {complete_name} has given the comfirmation number {booking_id}, which hasn't been found in the database.\nTherefore, they have not received any instructions!\nPlease make sure the data is right, and send manually.")
+            send_email(recipient_email="office@host-it.at", message=f"The guest {complete_name} has given the comfirmation number {booking_id}, which hasn't been found in the database.\nTherefore, they have not received any instructions!\nPlease make sure the data is right, and send manually.")
             logging.warning(f"Could NOT find the booking_id {booking_id} given by the guest! Could it be from a property outside of the system")
 
     except Exception as e:
@@ -660,7 +670,7 @@ def get_n_guests(reservation_z):
     return adults + children
 
 
-def send_check_in_instructions(recipient_email: str, message: str):
+def send_email(recipient_email: str, message: str):
     """For now, only for the properties on the system! The rest is handled by Smoobu."""
     message = Mail(
         from_email='office@host-it.at',
