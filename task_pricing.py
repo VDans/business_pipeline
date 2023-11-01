@@ -29,7 +29,7 @@ def check_prices():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
+    flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
     for flat in flats:
         logging.info(f"----- Processing prices in flat {flat}")
 
@@ -67,10 +67,7 @@ def check_prices():
         # First check if property on booking:
         p_check = z.check_property(channel_id="1", unit_id_z=secrets["flats"][flat]["pid_booking"]).json()
         if p_check["status"]["returnCode"] == "200":
-            try:
-                adjust_prices(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], prices_gsheet=prices_gsheet)
-            except Exception as ex:
-                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
+            adjust_prices(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], prices_gsheet=prices_gsheet)
 
         else:
             logging.info(f"Property NOT active on Booking.com. SKIPPING")
@@ -99,7 +96,11 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
-        price_z += list(zip([datetime.strptime(d["date"], "%Y-%m-%d") for d in room_data], [d["rates"][0]["price"] for d in room_data]))
+        try:
+            price_z += list(zip([datetime.strptime(d["date"], "%Y-%m-%d") for d in room_data], [d["rates"][0]["price"] for d in room_data]))
+        except TypeError:
+            logging.error(f"TypeError: Cannot go further than {init_date}. Moving on with price checks until that date.")
+            break
         init_date += pd.Timedelta(days=30)
 
     # Make sure the dates ranges are the same:
@@ -120,7 +121,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
             logging.info(f"Pushed new price 30 to {channel_name} with response: {response['status']['returnMessage']}")
 
         if p_g != p_z:
-            logging.info(f"DELTA: {date}: {p_g} vs {p_z}")
+            logging.info(f"DELTA: {date}: {p_g} (User) vs {p_z} (Platform)")
             # Google is the absolute truth
             response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=p_g).json()
             logging.info(f"Pushed new price {p_g} to {channel_name} with response: {response['status']['returnMessage']}")
@@ -159,10 +160,7 @@ def check_minimum_nights():
         # First check if property on booking:
         p_check = z.check_property(channel_id="1", unit_id_z=secrets["flats"][flat]["pid_booking"]).json()
         if p_check["status"]["returnCode"] == "200":
-            try:
-                adjust_min_nights(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], min_gsheet=min_gsheet)
-            except Exception as ex:
-                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
+            adjust_min_nights(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], min_gsheet=min_gsheet)
 
         else:
             logging.info(f"Property NOT active on Booking.com. SKIPPING")
@@ -191,7 +189,12 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
-        min_z += list(zip([datetime.strptime(d["date"], "%Y-%m-%d") for d in room_data], [d["rates"][0]["minStayThrough"] for d in room_data]))
+        try:
+            min_z += list(zip([datetime.strptime(d["date"], "%Y-%m-%d") for d in room_data], [d["rates"][0]["minStayThrough"] for d in room_data]))
+        except TypeError:
+            logging.error(
+                f"TypeError: Cannot go further than {init_date}. Moving on with min. nights checks until that date.")
+            break
         init_date += pd.Timedelta(days=30)
 
     # Make sure the dates ranges are the same:

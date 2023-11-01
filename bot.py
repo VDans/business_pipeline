@@ -152,7 +152,7 @@ def manage_availability():
 
             try:
                 # Update OLD reservation data DB status to 'Modified'
-                upd = update(tbl).where(tbl.c.booking_id == str(data['reservationId'])).values(status="Modified")
+                upd = update(tbl).where(tbl.c.booking_id == str(data['reservationId']), tbl.c.status == "OK").values(status="Modified")
                 with db_engine.begin() as conn:
                     conn.execute(upd)
                     logging.info(f"UPDATE bookings SET status = 'Modified' WHERE booking_id = '{data['reservationId']}'")

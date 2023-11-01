@@ -53,18 +53,18 @@ def send_sms(booking, c):
 
 
 def send_sms_manager(booking, s):
-    logging.info(f"Sending email to valen@live.be")
+    logging.info(f"Sending email to office@host-it.at")
     guests = ""
     for i in range(len(booking["phone"])):
-        guests += f"<p>{booking['guest_name'][i]} - {booking['reservation_start'][i].strftime('%Y-%m-%d')} - {booking['booking_id'][i]} - {booking['phone'][i]}</p>"
+        guests += f"<p>{booking['object']}: {booking['guest_name'][i]} - {booking['reservation_start'][i].strftime('%Y-%m-%d')} - {booking['booking_id'][i]}</p>"
 
     message_body = \
         f"""{len(booking["phone"])} guest/s have not filled the online check-in: {guests}"""
 
     message = Mail(
         from_email='office@host-it.at',
-        to_emails="valen@live.be",
-        subject="Check-In instructions",
+        to_emails="office@host-it.at",
+        subject="Daily Missing Online Check-Ins",
         html_content=message_body)
 
     sg = SendGridAPIClient(api_key=s["twilio"]["email_api_key"])

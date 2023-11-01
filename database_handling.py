@@ -224,10 +224,12 @@ class DatabaseHandler:
                 fees = reservation_z["reservations"]["rooms"][0]["priceDetailsExtra"]  # List of extra fees
                 cleaning_fee = 0
                 for f in fees:
-                    if (f["text"] == "Cleaning fee") & (f["included"] == "no"):
+                    if (f["text"] in ["Cleaning fee", "Reinigungsgebühr"]) & (f["type"] == "hotel"):
                         cleaning_fee += int(float(f["amount"]))
             else:
                 cleaning_fee = int(float(reservation_z["fullResponse"]["listingCleaningFeeAccurate"]))
+
+            logging.info(f"Cleaning fee after computation: {cleaning_fee}")
         except KeyError as ke:
             logging.error(f"Error in finding fees for flat {flat_name}, with error: {ke}. Moving on with fees = 0")
             cleaning_fee = 0
