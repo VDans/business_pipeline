@@ -13,15 +13,11 @@ secrets = json.load(open('config_secrets.json'))
 
 def shift_sheet():
     """
-    1x a day, shift cells up by 1.
-    1/ Clear notes and merges
-    2/ Shift them up by 1
-    3/ Clear notes and merges on the last row (Which got added) by /2. (always row 500)
-    4/ Another task will take care of the data
+    The difference here is that we remove the notes, and we erase everything, not only the merging and notes, but the writing too.
     """
     logging.warning(f"The time right now is: {pd.Timestamp.now()}")
 
-    g = Google(secrets, secrets["google"]["pricing_workbook_id"])
+    g = Google(secrets, secrets["google"]["availability_overview_workbook_id"])
     sheet_id = 920578163
 
     # /1
@@ -48,11 +44,11 @@ def shift_sheet():
     logging.info(f"Shifted all cells up by 1 row")
 
     # 3/ Clear last row
-    g.clear_range("B500:ZZ500")
+    g.clear_range("B3:ZZ500")
     logging.info(f"Cleared the last row")
 
     # 4/ Rewrite data
-    n = Notes(secrets=secrets, google=g)
+    n = Notes(secrets=secrets, google=g, notes=False)
     n.write_notes()
 
 

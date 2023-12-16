@@ -24,6 +24,8 @@ def copy_db():
     sql = open("sql/task_bookings.sql").read()
     bookings = dbh.query_data(sql=sql, dtypes={"booking_date": str, "reservation_start": str, "reservation_end": str, "phone": str, "end_of_month_start": str, "end_of_month_end": str})
 
+    bookings = bookings[bookings["reservation_start"] >= '2023-01-01']
+
     # 2/ Clear Google Sheet
     g.clear_range(cell_range="A1:ZZ10000")
 

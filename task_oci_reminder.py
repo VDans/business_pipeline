@@ -17,28 +17,28 @@ def send_sms(booking, c):
         logging.info(f"Sending SMS to {booking['phone']}")
         if booking["phone"][:3] in ["+43", "+49"]:
             message_body = \
-                f"""Hallo!
-    Ich bin der Gastgeber für Ihr Apartment in Wien.
-    Ich habe bemerkt, dass Sie meine Nachrichten auf {booking["platform"]} nicht gesehen haben.
-    Daher sende ich Ihnen hier eine Erinnerung, dies Online-Check-in-Formular auszufüllen.
+f"""Hallo!
+Ich bin der Gastgeber für Ihr Apartment in Wien.
+Ich habe bemerkt, dass Sie meine Nachrichten auf {booking["platform"]} nicht gesehen haben.
+Daher sende ich Ihnen hier eine Erinnerung, dies Online-Check-in-Formular auszufüllen.
 
-    Https://hostit.typeform.com/online-checkin
+Https://hostit.typeform.com/online-checkin
 
-    Ihre Buchungsnummer lautet: {booking["booking_id"]}
-    Sobald dies geschehen ist, werden Sie auf {booking["platform"]} genaue Anweisungen erhalten, wie Sie Ihre Wohnung betreten können.
-    Einen schönen Tag noch!"""
+Ihre Buchungsnummer lautet: {booking["booking_id"]}
+Sobald dies geschehen ist, werden Sie auf {booking["platform"]} genaue Anweisungen erhalten, wie Sie Ihre Wohnung betreten können.
+Einen schönen Tag noch!"""
         else:
             message_body = \
-                f"""Hello!
-    This is the host for your apartment in Vienna.
-    We noticed that you have not seen our messages on {booking["platform"]}.
-    Therefore, we send you here a reminder to fill our online check-in form:
+f"""Hello!
+This is the host for your apartment in Vienna.
+We noticed that you have not seen our messages on {booking["platform"]}.
+Therefore, we send you here a reminder to fill our online check-in form:
 
-    Https://hostit.typeform.com/online-checkin
+Https://hostit.typeform.com/online-checkin
 
-    Your booking number is: {booking["booking_id"]}
-    Once this is done, you will receive precise instructions on {booking["platform"]} on how to enter your flat.
-    Have a good day!"""
+Your booking number is: {booking["booking_id"]}
+Once this is done, you will receive precise instructions on {booking["platform"]} on how to enter your flat.
+Have a good day!"""
 
         response = c.messages.create(
             from_="+436703085269",
@@ -56,7 +56,7 @@ def send_sms_manager(booking, s):
     logging.info(f"Sending email to office@host-it.at")
     guests = ""
     for i in range(len(booking["phone"])):
-        guests += f"<p>{booking['object']}: {booking['guest_name'][i]} - {booking['reservation_start'][i].strftime('%Y-%m-%d')} - {booking['booking_id'][i]}</p>"
+        guests += f"<p>{booking['object'][i]}: {booking['guest_name'][i]} - {booking['reservation_start'][i].strftime('%Y-%m-%d')} - {booking['booking_id'][i]}</p>"
 
     message_body = \
         f"""{len(booking["phone"])} guest/s have not filled the online check-in: {guests}"""

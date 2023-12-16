@@ -3,4 +3,6 @@ SELECT
 FROM
     bookings a NATURAL
 JOIN
-    public.bookings_kpis b;
+    bookings_kpis b
+WHERE
+    a.object NOT IN ( 'BERGSTEIG' );

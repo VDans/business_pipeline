@@ -60,7 +60,7 @@ def manage_availability():
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
         if str(reservation_z['status']['returnCode']) == "400":
             logging.warning(f"Status 400 was returned when looking up the reservation. Sending warning email.")
-            send_email(recipient_email="office@host-it.at", message=f"""Action required: Reservation not found. Data received: {data}""")
+            send_email(recipient_email="office@host-it.at", subject="Reservation Error: Action Required", message=f"""Action required: Reservation not found. Data received: {data}""")
         else:
             logging.info("Retrieved reservation data")
 
@@ -165,16 +165,22 @@ def manage_availability():
                 old_dates = dbh.query_data(f"SELECT reservation_start, reservation_end FROM bookings WHERE status = 'Modified' AND booking_id = '{data['reservationId']}'")
                 old_date_from = pd.Timestamp(old_dates["reservation_start"][0])
                 old_date_to = pd.Timestamp(old_dates["reservation_end"][0])
-                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=old_date_from, date_to=old_date_to, availability=1)
-                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=old_date_from, date_to=old_date_to+pd.Timedelta(days=-1), availability=1)
+
+                # Safety. If the from_date is before today, it would refuse to close!
+                old_date_from_today = pd.Timestamp.now() if old_date_from < pd.Timestamp.now() else old_date_from
+                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=old_date_from_today, date_to=old_date_to, availability=1)
+                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=old_date_from_today, date_to=old_date_to+pd.Timedelta(days=-1), availability=1)
                 logging.info("Old dates have been opened in both channels")
 
                 # Get NEW dates, and close them:
                 new_date_from = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["arrivalDate"])
                 new_date_to = pd.Timestamp(reservation_z["reservations"]["rooms"][0]["departureDate"])
-                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=new_date_from, date_to=new_date_to, availability=0)
-                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
-                logging.info("New dates have been closed in both channels")
+
+                # Safety. If the from_date is before today, it would refuse to close!
+                new_date_from_today = pd.Timestamp.now() if new_date_from < pd.Timestamp.now() else new_date_from
+                z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=new_date_from_today, date_to=new_date_to, availability=0)
+                z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from_today, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
+                logging.info(f"New dates have been closed in both channels: {new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}")
 
                 logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
 
@@ -426,8 +432,11 @@ def check_in_online():
 
     # The first step is to identify the booking.
     try:
-        booking_id_json = list(filter(lambda x: x["field"]["id"] == "aYx6wPeuUVQB", fa))
-        booking_id = booking_id_json[0]["text"].upper()
+        booking_id = data["form_response"]["hidden"]["booking_id"]
+        if booking_id == "":
+            booking_id_json = list(filter(lambda x: x["field"]["id"] == "aYx6wPeuUVQB", fa))
+            booking_id = booking_id_json[0]["text"].upper()
+
     except Exception as e:
         booking_id = None
         logging.error(f"Could not find booking_id with error: {e}")
@@ -524,7 +533,8 @@ def check_in_online():
         "id_type": [id_type],
         "eta": [eta],
         "beds": [beds],
-        "booking_id": [booking_id]
+        "booking_id": [booking_id],
+        "submission_date": [pd.Timestamp.today()]
     })
 
     logging.info(f"Checking if this combination of booking_id and complete name is already on the database...")
@@ -560,8 +570,9 @@ def check_in_online():
                 check_in_instructions = _check_in_instructions["message"][0]
                 logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
 
-                # Send the email:
+                # Send the emails - 1 to the platform-bound email address, one to the email address given by the guest:
                 send_email(recipient_email=recipient_email, message=check_in_instructions)
+                send_email(recipient_email=email_address, message=check_in_instructions)
 
             else:
                 logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. Switching language...")
@@ -572,14 +583,15 @@ def check_in_online():
                     check_in_instructions = _check_in_instructions["message"][0]
                     logging.info(f"Checking instructions in {language} for flat {flat_name} found.")
 
-                    # Send the email:
+                    # Send the emails - 1 to the platform-bound email address, one to the email address given by the guest:
                     send_email(recipient_email=recipient_email, message=check_in_instructions)
+                    send_email(recipient_email=email_address, message=check_in_instructions)
 
                 else:
                     logging.info(f"Checking instructions in {language} for flat {flat_name} NOT found. The instructions are not available in this flat...")
 
         else:
-            send_email(recipient_email="office@host-it.at", message=f"The guest {complete_name} has given the comfirmation number {booking_id}, which hasn't been found in the database.\nTherefore, they have not received any instructions!\nPlease make sure the data is right, and send manually.")
+            send_email(recipient_email="office@host-it.at", subject="Online Check-In Warning", message=f"The guest {complete_name} has given the comfirmation number {booking_id}, which hasn't been found in the database.\nTherefore, they have not received any instructions!\nPlease make sure the data is right, and send manually.")
             logging.warning(f"Could NOT find the booking_id {booking_id} given by the guest! Could it be from a property outside of the system")
 
     except Exception as e:
@@ -670,12 +682,12 @@ def get_n_guests(reservation_z):
     return adults + children
 
 
-def send_email(recipient_email: str, message: str):
+def send_email(recipient_email: str, message: str, subject: str = "Check-In instructions"):
     """For now, only for the properties on the system! The rest is handled by Smoobu."""
     message = Mail(
         from_email='office@host-it.at',
         to_emails=recipient_email,
-        subject="Check-In instructions",
+        subject=subject,
         html_content=message)
     try:
         sg = SendGridAPIClient(api_key=secrets["twilio"]["email_api_key"])
