@@ -67,7 +67,10 @@ def check_prices():
         # First check if property on booking:
         p_check = z.check_property(channel_id="1", unit_id_z=secrets["flats"][flat]["pid_booking"]).json()
         if p_check["status"]["returnCode"] == "200":
-            adjust_prices(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], prices_gsheet=prices_gsheet)
+            try:
+                adjust_prices(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], prices_gsheet=prices_gsheet)
+            except Exception as ex:
+                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
 
         else:
             logging.info(f"Property NOT active on Booking.com. SKIPPING")
@@ -160,7 +163,10 @@ def check_minimum_nights():
         # First check if property on booking:
         p_check = z.check_property(channel_id="1", unit_id_z=secrets["flats"][flat]["pid_booking"]).json()
         if p_check["status"]["returnCode"] == "200":
-            adjust_min_nights(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], min_gsheet=min_gsheet)
+            try:
+                adjust_min_nights(z=z, channel_id_z="1", unit_id_z=secrets["flats"][flat]["pid_booking"], room_id_z=secrets["flats"][flat]["rid_booking"], rate_id_z=secrets["flats"][flat]["rtid_booking"], min_gsheet=min_gsheet)
+            except Exception as ex:
+                logging.error(f"ERROR: Could not process Booking.com with exception: {ex}")
 
         else:
             logging.info(f"Property NOT active on Booking.com. SKIPPING")

@@ -63,7 +63,7 @@ def send_sms_manager(booking, s):
 
     message = Mail(
         from_email='office@host-it.at',
-        to_emails="office@host-it.at",
+        to_emails=["office@host-it.at", "lena.jovanovic.mj@gmail.com"],
         subject="Daily Missing Online Check-Ins",
         html_content=message_body)
 

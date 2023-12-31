@@ -83,11 +83,9 @@ class DatabaseHandler:
             logging.error(f"Could not find number of guests with exception: {ex}")
 
         # Nights Price
-        try:
-            nights_price = float(data["reservation"]["totalPrice"])
-        except Exception as ex:
-            nights_price = None
-            logging.error(f"Could not find nights_price with exception: {ex}")
+        nights_price = self.extract_nights_price(channel_id_z=channel_id_z,
+                                                 reservation_z=reservation_z,
+                                                 flat_name=flat_name)
 
         # Cleaning Fee
         cleaning_fee = self.extract_cleaning_fee(channel_id_z=channel_id_z,
@@ -235,3 +233,23 @@ class DatabaseHandler:
             cleaning_fee = 0
 
         return cleaning_fee
+
+    @staticmethod
+    def extract_nights_price(channel_id_z, reservation_z, flat_name):
+        logging.info(f"Extracting nights price from reservation data")
+
+        try:
+            nights_price = float(reservation_z["reservations"]["reservation"]["totalPrice"])
+            if str(channel_id_z) == "3":
+                try:
+                    extras = reservation_z["fullResponse"]["standardFeesDetails"]  # List of extra income fees
+                    for f in extras:
+                        nights_price += int(float(f["amountNative"]))  # Include pet fees and other extras that might pop up.
+                except Exception:
+                    logging.warning(f"Extra fees could not be found. Moving on.")
+            logging.info(f"Nights price after computation: {nights_price}")
+        except KeyError as ke:
+            logging.error(f"Error in finding price for flat {flat_name}, with error: {ke}. Moving on with price = 0!!")
+            nights_price = 0
+
+        return nights_price

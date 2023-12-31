@@ -39,14 +39,6 @@ def manage_availability():
     try:
         reservation_status_z = data["reservationStatus"]
         logging.info(f"Retrieved the reservationStatus: {reservation_status_z}")
-        try:
-            if str(data["channelId"]) == '1':
-                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["pid_booking"] == data["propertyId"]) or (data["propertyId"] in secrets["flats"][fn]["older_pid"])][0]
-            else:
-                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["pid_airbnb"] == data["propertyId"]) or (data["propertyId"] in secrets["flats"][fn]["older_pid"])][0]
-        except Exception as e:
-            flat_name = "UNKNOWN"
-            logging.error(f"Could NOT retrieve the flat name: {e}")
 
         channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
@@ -56,7 +48,7 @@ def manage_availability():
         dbh = DatabaseHandler(db_engine, secrets)
         offset = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15)) - 3  # Rolling window. -3 for 3 headers rows!
 
-        # Find the reservation
+        # Retrieve the reservation - Needs Zodomus
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
         if str(reservation_z['status']['returnCode']) == "400":
             logging.warning(f"Status 400 was returned when looking up the reservation. Sending warning email.")
@@ -64,20 +56,29 @@ def manage_availability():
         else:
             logging.info("Retrieved reservation data")
 
+        # Matching the flat name - Based on room_id and no more property_id
+        try:
+            room_id = reservation_z["reservations"]["rooms"][0]["id"]
+            if str(data["channelId"]) == '1':
+                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_booking"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
+            elif str(data["channelId"]) == '3':
+                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_airbnb"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
+            else:
+                flat_name = "UNKNOWN"
+                logging.warning(f"Could not identify the channel_id: {data['channelId']}")
+            logging.error(f"Retrieved the flat name")
+
+        except Exception as e:
+            flat_name = "UNKNOWN"
+            logging.error(f"Could NOT retrieve the flat name: {e}")
+
         # Initiate bookings table
         tbl = Table("bookings", MetaData(), autoload_with=db_engine)
 
         logging.info(f"Step 1 finishes at timestamp {time.time() - start_time} seconds.")
 
         if reservation_status_z == '1':  # New
-            # Exception at GBS & BSG. If other exceptions appear, change pid/rid logic.
-            if (flat_name == "GBS") and (channel_name == "Booking"):
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
-            if (flat_name == "BSG") and (channel_name == "Booking"):
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
-
             logging.info(f"New booking in {flat_name} from {reservation_z['reservations']['rooms'][0]['arrivalDate']} to {reservation_z['reservations']['rooms'][0]['departureDate']}")
-
             # Upload the reservation data to the DB:
             try:
                 dbh.upload_reservation(channel_id_z=data["channelId"], flat_name=flat_name, reservation_z=reservation_z)
@@ -114,40 +115,7 @@ def manage_availability():
                 logging.warning(f"Could not write to sheet: {ex}")
             logging.info(f"Step 3 finishes at timestamp {time.time() - start_time} seconds.")
 
-            # Get n_guests
-            try:
-                n_guests = get_n_guests(reservation_z)
-                logging.info(f"There are {n_guests} guests.")
-            except Exception as e:
-                logging.warning(f"Couldn't obtain number of guests: {e}")
-                n_guests = -1
-
-            # Merge the cells based on the first one:
-            try:
-                g.merge_cells2(date_from, date_to, flat_name, offset)
-            except Exception as ex:
-                logging.error(f"Could not merge cells with exception: {ex}")
-            logging.info(f"Step 4 finishes at timestamp {time.time() - start_time} seconds.")
-
-            try:
-                cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
-                total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                duration = (date_to - date_from).days
-                note = f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nNights: {duration}\nFrom {date_from.strftime("%d.%m")} To {date_to.strftime("%d.%m")}\nID: {data["reservationId"]}"""
-                g.write_note2(date_from, date_from, flat_name, note=note, offset=offset)
-            except Exception as ex:
-                logging.error(f"Could not write note! Exception: {ex}")
-
-            logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
-            logging.info(f"Step 5 finishes at timestamp {time.time() - start_time} seconds.")
-
         elif reservation_status_z == '2':  # Modified
-            # Exception at GBS... If other exceptions appear, change pid/rid logic.
-            if (flat_name == "GBS") and (channel_name == "Booking"):
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
-            if (flat_name == "BSG") and (channel_name == "Booking"):
-                flat_name = [fn for fn in secrets['flats'] if secrets["flats"][fn]["rid_booking"] == reservation_z["reservations"]["rooms"][0]["id"]][0]
-
             logging.info(f"Modified booking in {flat_name}")
 
             try:
@@ -220,21 +188,6 @@ def manage_availability():
                 except Exception as ex:
                     logging.warning(f"Could not write to sheet: {ex}")
 
-                try:
-                    g.merge_cells2(new_date_from, new_date_to, flat_name, offset=offset)
-                except Exception as ex:
-                    logging.error(f"Could not merge cells with exception: {ex}")
-
-                try:
-                    cleaning_fee = dbh.extract_cleaning_fee(channel_id_z=str(data["channelId"]), reservation_z=reservation_z, flat_name=flat_name)
-                    total_price = float(reservation_z["reservations"]["rooms"][0]["totalPrice"]) + cleaning_fee
-                    duration = (new_date_to - new_date_from).days
-                    note = f"""{reservation_z["reservations"]["customer"]["firstName"].title()} {reservation_z["reservations"]["customer"]["lastName"].title()}\nPaid {total_price}€\nGuests: {n_guests}\nNights: {duration}\nFrom {new_date_from.strftime("%d.%m")} To {new_date_to.strftime("%d.%m")}\nID: {data["reservationId"]}"""
-                    g.write_note2(new_date_from, new_date_from, flat_name, note=note, offset=offset)
-
-                except Exception as ex:
-                    logging.error(f"Could not write note! Exception: {ex}")
-
                 logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
 
             except KeyError as ke:
@@ -242,12 +195,6 @@ def manage_availability():
                 # body = f"ERROR: Could not process modification"
 
         elif reservation_status_z == '3':  # Cancelled
-            # Exception at GBS & BSG:
-            if (flat_name == "GBS") and (channel_name == "Booking"):
-                flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
-            if (flat_name == "BSG") and (channel_name == "Booking"):
-                flat_name = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")["object"][0]
-
             logging.info(f"Cancelled booking {str(data['reservationId'])} in {flat_name}")
             try:
                 with db_engine.begin() as conn:
