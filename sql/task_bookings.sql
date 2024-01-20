@@ -5,4 +5,4 @@ FROM
 JOIN
     bookings_kpis b
 WHERE
-    a.object NOT IN ( 'BERGSTEIG' );
+    a.object NOT IN ( 'BERGSTEIG', 'OAS' );

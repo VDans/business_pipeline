@@ -16,7 +16,7 @@ dbh = DatabaseHandler(db_engine, secrets)
 
 def write_cleanings():
     """
-    This task runs once a day.
+    This task runs once an hour.
 
     Get flat name, checkout date, and number of guests from each reservation.
     For each, find out the correct Google workbook id and write to the correct cell according to the flat and date.

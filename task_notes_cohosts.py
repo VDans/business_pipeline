@@ -125,11 +125,14 @@ def update_notes_cohosts():
 
 		# Once you are done with the workbook, execute the batchRequest:
 		# Write cell values
-		g.batch_write_to_cell(data=dat)
+		if dat:
+			g.batch_write_to_cell(data=dat)
 		# Write notes
-		g.batch_write_notes(requests=notes)
+		if notes:
+			g.batch_write_notes(requests=notes)
 		# Merge booking cells
-		g.batch_request(requests=merg)
+		if merg:
+			g.batch_request(requests=merg)
 
 		logging.info("Processed all notes for this flat.")
 

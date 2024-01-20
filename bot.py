@@ -4,6 +4,8 @@ import time
 
 import pandas as pd
 from flask import Flask, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
@@ -16,6 +18,11 @@ from google_api import Google
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 secrets = json.load(open('config_secrets.json'))
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["30 per minute"]
+)
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -24,6 +31,7 @@ def hello_world():
 
 
 @app.route('/availability', methods=['POST'])
+@limiter.exempt
 def manage_availability():
     """
     Zodomus only sends a notification that a new/changed/cancelled reservation happens.
@@ -32,6 +40,7 @@ def manage_availability():
     3. Using the dates and property retrieved in (.2), close dates using the API call.
     """
     start_time = time.time()  # Checking the length of each request
+
     data = request.json
     logging.info("------------------------------------------------------------------------------------------------")
     logging.info("AVAILABILITY New Request------------------------------------------------------------------------")
@@ -48,25 +57,34 @@ def manage_availability():
         dbh = DatabaseHandler(db_engine, secrets)
         offset = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15)) - 3  # Rolling window. -3 for 3 headers rows!
 
-        # Retrieve the reservation - Needs Zodomus
+        # Retrieve the reservation - Needs Zodomus Connection
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
         if str(reservation_z['status']['returnCode']) == "400":
             logging.warning(f"Status 400 was returned when looking up the reservation. Sending warning email.")
             send_email(recipient_email="office@host-it.at", subject="Reservation Error: Action Required", message=f"""Action required: Reservation not found. Data received: {data}""")
         else:
-            logging.info("Retrieved reservation data")
+            logging.info(f"Retrieved reservation data: {data['reservationId']}")
 
         # Matching the flat name - Based on room_id and no more property_id
         try:
-            room_id = reservation_z["reservations"]["rooms"][0]["id"]
-            if str(data["channelId"]) == '1':
-                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_booking"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
-            elif str(data["channelId"]) == '3':
-                flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_airbnb"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
+            if reservation_status_z == '3':
+                # FixMe: This should consider the case where multiple rooms are cancelled for bookings which contains 2 or more rooms!
+                # By cancellations, the room ID is not communicated anymore! Therefore, find the flat in the DB directly.
+                flat_name_df = dbh.query_data(f"SELECT object FROM bookings WHERE status = 'OK' AND booking_id = '{data['reservationId']}'")
+                flat_name = flat_name_df["object"][0]
             else:
-                flat_name = "UNKNOWN"
-                logging.warning(f"Could not identify the channel_id: {data['channelId']}")
-            logging.error(f"Retrieved the flat name")
+                # ToDo: This should accept the bookings which contain more than one room booked.
+                room_id = reservation_z["reservations"]["rooms"][0]["id"]
+                logging.info(f"Retrieved the room_id: {room_id}")
+                if str(data["channelId"]) == '1':
+                    flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_booking"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
+                elif str(data["channelId"]) == '3':
+                    flat_name = [fn for fn in secrets['flats'] if (secrets["flats"][fn]["rid_airbnb"] == room_id) or (room_id in secrets["flats"][fn]["older_rid"])][0]
+                else:
+                    flat_name = "UNKNOWN"
+                    logging.warning(f"Could not identify the channel_id: {data['channelId']}")
+
+            logging.info(f"Retrieved the flat name: {flat_name}")
 
         except Exception as e:
             flat_name = "UNKNOWN"
@@ -276,6 +294,8 @@ def manage_availability():
 
 
 @app.route('/pricing', methods=['POST'])
+@limiter.limit("30 per minute")
+@limiter.limit("1 per second")
 def get_prices():
     """
     This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
@@ -315,6 +335,7 @@ def get_prices():
             if data["value_type"] == "Price":
                 logging.info(f"Modifying price: Pushing to channels")
                 response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
+                time.sleep(1)
                 response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
 
             elif data["value_type"] == "Min.":
@@ -322,12 +343,14 @@ def get_prices():
                     # 3. If min_nights = 0: Close the room for the night in both channels
                     logging.info("Min. Nights set to 0. Closing the room.")
                     z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
+                    time.sleep(1)
                     z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
 
                 else:
                     logging.info(f"Making sure availability is open before pushing min. nights value")
                     # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
                     z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
+                    time.sleep(1)
                     z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
 
                     # 2. Change the minimum nights on the platforms
@@ -341,6 +364,7 @@ def get_prices():
 
                     logging.info(f"Pushing min. nights value")
                     z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
+                    time.sleep(1)
                     z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
 
             else:
@@ -360,6 +384,7 @@ def get_prices():
 
 
 @app.route('/online-checkin', methods=['POST'])
+@limiter.exempt
 def check_in_online():
     """
     Receive webhook from TypeForm Website with needed data.
@@ -456,11 +481,18 @@ def check_in_online():
         logging.error(f"Could not find id_type with error: {e}")
 
     try:
-        eta_json = list(filter(lambda x: x["field"]["id"] == "0VQK8k56v3Tb", fa))
-        eta = eta_json[0]["text"]
+        eta_json = list(filter(lambda x: x["field"]["id"] == "wyC1teWTVx6P", fa))
+        eta = eta_json[0]["choice"]["label"]
     except Exception as e:
         eta = None
         logging.error(f"Could not find ETA with error: {e}")
+
+    try:
+        etd_json = list(filter(lambda x: x["field"]["id"] == "z4d9kcjjt2ik", fa))
+        etd = etd_json[0]["choice"]["label"]
+    except Exception as e:
+        etd = None
+        logging.error(f"Could not find ETD with error: {e}")
 
     try:
         beds_json = list(filter(lambda x: x["field"]["id"] == "dGapMiuCAuWX", fa))
@@ -479,6 +511,7 @@ def check_in_online():
         "phone_number": [phone_number],
         "id_type": [id_type],
         "eta": [eta],
+        "etd": [etd],
         "beds": [beds],
         "booking_id": [booking_id],
         "submission_date": [pd.Timestamp.today()]
@@ -553,6 +586,7 @@ def check_in_online():
 
 
 @app.route('/code', methods=['POST'])
+@limiter.exempt
 def get_code():
     """
     This url is called by the Google Webhook when a change occurs in the Lockboxes Codes' Google Sheet.

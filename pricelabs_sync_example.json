@@ -1,0 +1,44 @@
+{
+  "listing_id": "hds1",
+  "last_refreshed": "2024-01-01",
+  "data": [
+    {
+      "price": 0,
+      "date": "string",
+      "min_stay": 0,
+      "check_in": true,
+      "check_out": true,
+      "weekly_discount": 0,
+      "monthly_discount": 0,
+      "extra_person_fee": 0,
+      "extra_person_fee_trigger": 0,
+      "los_discount_v2": {
+        "los": {
+          "los_night": "1",
+          "max_price": "string",
+          "min_price": "string",
+          "los_adjustment": "10"
+        }
+      }
+    },
+    {
+      "price": 0,
+      "date": "string",
+      "min_stay": 0,
+      "check_in": true,
+      "check_out": true,
+      "weekly_discount": 0,
+      "monthly_discount": 0,
+      "extra_person_fee": 0,
+      "extra_person_fee_trigger": 0,
+      "los_discount_v2": {
+        "los": {
+          "los_night": "1",
+          "max_price": "string",
+          "min_price": "string",
+          "los_adjustment": "10"
+        }
+      }
+    }
+  ]
+}

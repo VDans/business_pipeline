@@ -14,9 +14,11 @@ secrets = json.load(open('config_secrets.json'))
 db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
 
+# Important: The API calls should be limited to 30 per minute, app. 1 per 2 seconds. Hence the time.sleep()
+
 
 def close_dates_z(booking, z, flat, s):
-    time.sleep(1)
+    time.sleep(4)
     if s["flats"][flat]["pid_booking"] != "":
         response = z.set_availability(channel_id="1", unit_id_z=s["flats"][flat]["pid_booking"], room_id_z=s["flats"][flat]["rid_booking"], date_from=booking["reservation_start"], date_to=booking["reservation_end"], availability=0)
         logging.info(f"Closed {flat} on Booking.com from {booking['reservation_start']} to {booking['reservation_end']} with response: {response.json()['status']['returnMessage']}")

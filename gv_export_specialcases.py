@@ -11,13 +11,14 @@ dbh = DatabaseHandler(db_engine, secrets)
 
 OUTPUT_PATH = "G:/My Drive/Legal/Gästeverzeichnis"
 
+# Special cases include: GBS, LORY, RHG
 
 flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-date_from = pd.Timestamp(day=1, month=10, year=2023)
-date_to = pd.Timestamp(day=31, month=10, year=2023)
+date_from = pd.Timestamp(day=1, month=12, year=2023)
+date_to = pd.Timestamp(day=31, month=12, year=2023)
 
 sql = open("sql/gv_preparation.sql").read()
-gv_table = dbh.query_data(sql=sql.format(f"'G124', 'G125'", f"'{date_from.strftime('%Y-%m-%d')}'", f"'{date_to.strftime('%Y-%m-%d')}'"))
-gv_table.to_csv(path_or_buf=f"{OUTPUT_PATH}/{date_to.strftime('%Y-%m')}/{date_to.strftime('%Y%m')}_{f}.csv",
+gv_table = dbh.query_data(sql=sql.format(f"'RHG15', 'RHG20', 'RHG30', 'RHG32'", f"'{date_from.strftime('%Y-%m-%d')}'", f"'{date_to.strftime('%Y-%m-%d')}'"))
+gv_table.to_csv(path_or_buf=f"{OUTPUT_PATH}/{date_to.strftime('%Y-%m')}/{date_to.strftime('%Y%m')}_RHG_all.csv",
                 sep=";",
                 index=False)
