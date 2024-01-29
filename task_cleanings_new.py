@@ -24,9 +24,9 @@ def task_cleaning_new():
     quota = 0
 
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
-    cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if
-                                secrets["flats"][f]["cleaning_workbook_id"] != ""]))
-    cleaning_sheets = ["1_6USuS3QKfIT13sgk1iDf0m6Vq1c_djN2RhEXag0qww"]
+    # cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
+    # FOR NOW ONLY FATMA!
+    cleaning_sheets = ["1tbWy6dMqEp4zKIJquKJhpKBdfSqiiEVufvQ0on3dRss"]
     logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
     for cs in cleaning_sheets:
@@ -70,7 +70,7 @@ def task_cleaning_new():
 
 
 def add_write_snippet(booking, data, flat, g):
-    cell_range = g.get_rolling_range(unit_id=flat, date1=booking["reservation_start_adjusted"], headers_rows=3, col=secrets["flats"][flat]["cleaning_col"])
+    cell_range = g.get_rolling_range(unit_id=flat, date1=booking["reservation_start_adjusted"], headers_rows=2, col=secrets["flats"][flat]["cleaning_col"])
     snippet = {
         "range": cell_range,
         "values": [
@@ -80,13 +80,13 @@ def add_write_snippet(booking, data, flat, g):
     data.append(snippet)
 
 
-def add_notes_snippet(booking, notes, flat, internal_sheet_id, g, headers_rows: int = 3):
+def add_notes_snippet(booking, notes, flat, internal_sheet_id, g, headers_rows: int = 2):
     # Compute the ROLLING offset, based on today - 15 - headers_row:
     offset_exact = g.excel_date(booking["reservation_start_adjusted"])
     offset_first = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15))
     row = int(offset_exact - offset_first) + headers_rows  # Adjusting to the title rows where there's no date
 
-    note_body = f"""Gäste: {booking["n_guests"]}\nCheck-In: {booking["eta"]}\nCheck-Out: {booking["etd"]}\nWünsche: {booking["beds"]}"""
+    note_body = f"""Gäste: {booking["n_guests"]}\n{booking["reservation_start_adjusted"].strftime("%Y-%m-%d")} bis {booking["reservation_end"].strftime("%Y-%m-%d")}\nCheck-In: {booking["eta"]}\nCheck-Out: {booking["etd"]}\nWünsche: {booking["beds"]}"""
 
     snippet = {
         "updateCells": {
@@ -112,7 +112,7 @@ def add_notes_snippet(booking, notes, flat, internal_sheet_id, g, headers_rows: 
     notes.append(snippet)
 
 
-def add_merge_snippet(booking, merg, flat, internal_sheet_id, g, headers_rows: int = 3):
+def add_merge_snippet(booking, merg, flat, internal_sheet_id, g, headers_rows: int = 2):
     # Compute the ROLLING offset, based on today - 15 - headers_row:
     offset_exact = g.excel_date(booking["reservation_start_adjusted"])
     offset_first = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15))

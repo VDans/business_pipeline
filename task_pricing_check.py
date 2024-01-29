@@ -18,6 +18,9 @@ db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
 logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
+# flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
+flats = ["G125"]
+
 
 def check_prices():
     """
@@ -29,7 +32,6 @@ def check_prices():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
     for flat in flats:
         logging.info(f"----- Processing prices in flat {flat}")
 
@@ -140,7 +142,6 @@ def check_minimum_nights():
     """
     z = Zodomus(secrets=secrets)
     g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
     for flat in flats:
         logging.info(f"----- Processing minimum nights in flat {flat}")
 

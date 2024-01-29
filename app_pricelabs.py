@@ -73,6 +73,8 @@ def get_prices():
     # Only the new changes remain. Now only keep the latest changed value:
     df_diff = df_diff.drop_duplicates(subset=["price_date", "object"], keep="first").reset_index(drop=True)
 
+    print(df_diff)
+
     # Update is not a viable solution, as sometimes you need to add rows with new dates!
     # Delete where the index matches:
     if len(df_diff) > 0:

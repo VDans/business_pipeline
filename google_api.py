@@ -130,6 +130,20 @@ class Google:
 
         return sheet_range
 
+    def get_rolling_col(self, date1: pd.Timestamp, today_col="L"):
+        """
+        This function returns the COLUMN number within the pricing sheet, on which the given date is found.
+        """
+        # Number of days between today and date1?
+        days_offset = (date1 - pd.Timestamp.today()).days + 1  # This should give a number of days (integer).
+        # Today's column number
+        today_col_int = self.col2num(today_col)
+        # Target column number
+        target_col_int = today_col_int + days_offset
+        target_col = self.n_to_col(target_col_int)
+
+        return target_col
+
     def write_note(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, note: str, internal_sheet_id: int = 920578163):
         """Add a note to a cells range"""
         response = self.service_sheet.spreadsheets().batchUpdate(
@@ -302,6 +316,42 @@ class Google:
 
         return response
 
+    def uncolor_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int):
+        """
+        Careful: Indexing starts at 0 in the Google Sheet, for both rows and columns.
+        """
+        response = self.service_sheet.spreadsheets().batchUpdate(
+            spreadsheetId=self.workbook_id,
+            body={
+                "requests": [
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": internal_sheet_id,
+                                "startRowIndex": n_row_start,
+                                "endRowIndex": n_row_end,
+                                "startColumnIndex": n_col_start,
+                                "endColumnIndex": n_col_end
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "backgroundColor": {
+                                        "red": 1,
+                                        "green": 1,
+                                        "blue": 1,
+                                        "alpha": 1
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(backgroundColor)"
+                        }
+                    }
+                ]
+            }
+        ).execute()
+
+        return response
+
     @staticmethod
     def excel_date(date1):
         """Transform a date into an Excel Integer"""
@@ -323,6 +373,7 @@ class Google:
 
     @staticmethod
     def col2num(col):
+        # STARTS AT 0!!!!
         num = 0
         for c in col:
             if c in string.ascii_letters:

@@ -30,7 +30,7 @@ def write_cleanings():
 
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
     cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
-
+    cleaning_sheets.remove("1tbWy6dMqEp4zKIJquKJhpKBdfSqiiEVufvQ0on3dRss")
     logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
     for cs in cleaning_sheets:
