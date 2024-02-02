@@ -1,9 +1,10 @@
 import json
 import logging
 import time
+from zodomus_api import Zodomus
 import pandas as pd
 from datetime import datetime
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for, render_template
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -42,8 +43,10 @@ def get_prices():
     db_engine = create_engine(url=secrets["database"]["url"])
     dbh = DatabaseHandler(db_engine, secrets)
     pricing_tbl = Table("pricing", MetaData(), autoload_with=db_engine)
+    z = Zodomus(secrets=secrets)
 
-    # First slow but easy method:
+    # 1. SHEET TO DATABASE
+    # FixMe: First slow but easy method. Then improve on this
     df_google = pd.DataFrame(columns=["price_date", "object", "price", "min_nights"])
 
     for i in range(1, len(data)):
@@ -58,12 +61,12 @@ def get_prices():
             }
             df_google = pd.concat([df_google, pd.DataFrame(dict_temp)], ignore_index=True)
 
-    # Filter after today
-    df_google["price_date"] = df_google["price_date"][df_google["price_date"] >= datetime.today().date()]
+    # Take out the price dates where there is a booking:
+    df_google.loc[df_google['min_nights'] == "", "price"] = -1
+    df_google.loc[df_google['min_nights'] == "", "min_nights"] = 0
 
-    # Filter rows where min_nights values are not numbers. They are bookings.
-    df_google["min_nights"] = pd.to_numeric(df_google["min_nights"], errors="coerce")
-    df_google.dropna(how="any", inplace=True)
+    # Filter after today
+    df_google = df_google[df_google["price_date"] >= datetime.today().date()]
 
     # Now prepare the database table:
     df_db = dbh.query_data(f"SELECT * FROM pricing WHERE price_date >= CURRENT_DATE")
@@ -73,18 +76,34 @@ def get_prices():
     # Only the new changes remain. Now only keep the latest changed value:
     df_diff = df_diff.drop_duplicates(subset=["price_date", "object"], keep="first").reset_index(drop=True)
 
-    print(df_diff)
-
     # Update is not a viable solution, as sometimes you need to add rows with new dates!
     # Delete where the index matches:
     if len(df_diff) > 0:
+        logging.info(f"Delta Rows Found: {df_diff}")
         with db_engine.begin() as conn:
             for i in range(len(df_diff)):
-                p_d = df_diff["price_date"][i]
-                o = df_diff["object"][i]
-                delete_query = delete(pricing_tbl).where(pricing_tbl.c.object == o, pricing_tbl.c.price_date == p_d)
+                data1 = {
+                    "value_type": "Price",
+                    "new_value": df_diff['price'][i],
+                    "date": df_diff["price_date"][i],
+                    "flat_name": df_diff["object"][i]
+                }
+                data2 = {
+                    "value_type": "Min.",
+                    "new_value": df_diff["min_nights"][i],
+                    "date": df_diff["price_date"][i],
+                    "flat_name": df_diff["object"][i],
+                    "rightCellValue": 1000
+                }
+                delete_query = delete(pricing_tbl).where(pricing_tbl.c.object == data1["flat_name"], pricing_tbl.c.price_date == data1["date"])
                 conn.execute(delete_query)
-                logging.info(f"Replacing pricing where price_date = {p_d} and object = {o}")
+                logging.info(f"Object {data1['flat_name']} on the {data1['date']}: New price of {data1['new_value']} and min. nights of {data2['new_value']}")
+
+                # 2. DATABASE TO PLATFORMS:
+                # Push first the minimum nights:
+                m_nights_to_platform(z, data2)
+                # Then the price:
+                price_to_platform(z, data1)
 
             df_diff.to_sql(
                 index=None,
@@ -201,6 +220,89 @@ def hook_url():
     logging.info(f"This call lasted {end_time - start_time} seconds")
 
     return str("All Good!")
+
+
+def m_nights_to_platform(z, data):
+    start_time = time.time()
+    try:
+        # Find out the booking and airbnb propertyId
+        flat_name = data["flat_name"]
+        property_id_airbnb = secrets["flats"][flat_name]["pid_airbnb"]
+        room_id_airbnb = secrets["flats"][flat_name]["rid_airbnb"]
+        rate_id_airbnb = secrets["flats"][flat_name]["rtid_airbnb"]
+        property_id_booking = secrets["flats"][flat_name]["pid_booking"]
+        room_id_booking = secrets["flats"][flat_name]["rid_booking"]
+        rate_id_booking = secrets["flats"][flat_name]["rtid_booking"]
+
+    except KeyError:
+        logging.error(f"Could not find flat name: {data['flat_name']}, is it possible you're adding columns?")
+        return str("Thanks Google.")
+
+    if str(data["new_value"]) == "0":
+        # 3. If min_nights = 0: Close the room for the night in both channels
+        logging.info("Min. Nights set to 0. Closing the room.")
+        z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=data["date"], date_to=(data["date"] + pd.Timedelta(days=1)), availability=0)
+        time.sleep(1)
+        z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=data["date"], date_to=data["date"], availability=0)
+
+    else:
+        logging.info("Min. Nights is not 0. Opening the room.")
+        # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
+        z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=data["date"], date_to=(data["date"] + pd.Timedelta(days=1)), availability=1)
+        time.sleep(1)
+        z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=data["date"], date_to=data["date"], availability=1)
+
+        # 2. Change the minimum nights on the platforms
+        # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
+        # Therefore, you also have to communicate the price next to the min nights requirements...
+        try:
+            right_cell_value = int(data["rightCellValue"])
+        except Exception as ex:
+            right_cell_value = 500
+            logging.warning(f"No price is available! Setting price to 500 while waiting for a better price: {ex}")
+
+        logging.info(f"Pushing min. nights value")
+        z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=data["date"], min_nights=data["new_value"])
+        time.sleep(1)
+        z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=data["date"], price=right_cell_value, min_nights=data["new_value"])  # Fucking hate this...
+
+    logging.info("Pushed new min. nights")
+    end_time = time.time()
+    logging.info(f"This took {end_time - start_time} seconds")
+
+
+def price_to_platform(z, data):
+    start_time = time.time()
+
+    try:
+        # Find out the booking and airbnb propertyId
+        flat_name = data["flat_name"]
+        property_id_airbnb = secrets["flats"][flat_name]["pid_airbnb"]
+        room_id_airbnb = secrets["flats"][flat_name]["rid_airbnb"]
+        rate_id_airbnb = secrets["flats"][flat_name]["rtid_airbnb"]
+        property_id_booking = secrets["flats"][flat_name]["pid_booking"]
+        room_id_booking = secrets["flats"][flat_name]["rid_booking"]
+        rate_id_booking = secrets["flats"][flat_name]["rtid_booking"]
+
+    except KeyError:
+        logging.error(f"Could not find flat name: {data['flat_name']}, is it possible you're adding columns?")
+        return str("Thanks Google.")
+
+    # Clean Date and Value
+    date = pd.Timestamp(data["date"])
+    value = int(data["new_value"])  # Price and min nights as integers. No real need for decimals...
+    logging.info(f"Extracting data: Property: {data['flat_name']} - Date: {date.strftime('%Y-%m-%d')} - {data['value_type']}: {value}")
+
+    # Pushing data through Zodomus:
+    if data["value_type"] == "Price":
+        logging.info(f"Modifying price: Pushing to channels")
+        response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
+        time.sleep(1)
+        response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
+
+    logging.info("Pushed new price")
+    end_time = time.time()
+    logging.info(f"This took {end_time - start_time} seconds")
 
 
 if __name__ == '__main__':

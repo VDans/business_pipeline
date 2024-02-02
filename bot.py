@@ -483,15 +483,20 @@ def check_in_online():
     try:
         eta_json = list(filter(lambda x: x["field"]["id"] == "wyC1teWTVx6P", fa))
         eta = eta_json[0]["choice"]["label"]
-        # Take into account the early check-in responses:
+    except Exception as e:
+        eta = None
+        logging.error(f"Could not find ETA with error: {e}")
+
+    try:
         eci_json = list(filter(lambda x: x["field"]["id"] == "d5KeUxBhRENE", fa))
         eci_payment_success = eci_json[0]["payment"]["success"]
         if eci_payment_success:
             logging.info("Early check-in has been confirmed.")
             eta = "PRIORITÄT, so früh wie möglich, Max. 13:00."
-            send_email(recipient_email="office@host-it.at", message=f"New early check-in booked!\nGuest Name: {complete_name}\nBooking ID: {booking_id}", subject="New early check-in booked!")
+            send_email(recipient_email="office@host-it.at",
+                       message=f"New early check-in booked!\nGuest Name: {complete_name}\nBooking ID: {booking_id}",
+                       subject="New early check-in booked!")
     except Exception as e:
-        eta = None
         eci_payment_success = None
         logging.error(f"Could not find ETA with error: {e}")
 
@@ -522,7 +527,7 @@ def check_in_online():
         "etd": [etd],
         "beds": [beds],
         "booking_id": [booking_id],
-        "submission_date": [pd.Timestamp.today()],
+        "submission_date": [pd.Timestamp.now()],
         "eci": eci_payment_success
     })
 
