@@ -6,7 +6,7 @@ from database_handling import DatabaseHandler
 
 
 class NotesH:
-    def __init__(self, secrets, google, write: bool = True, merge: bool = True, notes: bool = True, color: bool = True):
+    def __init__(self, secrets, google, write: bool = True, merge: bool = True, notes: bool = True, color: bool = True, prices: bool = True):
         self.logger = logging.getLogger(__name__)
 
         self.secrets = secrets
@@ -15,6 +15,7 @@ class NotesH:
         self.notes = notes
         self.color = color
         self.merge = merge
+        self.prices = prices
 
         self.db_engine = create_engine(url=self.secrets["database"]["url"])
         self.dbh = DatabaseHandler(self.db_engine, secrets)
@@ -81,27 +82,29 @@ class NotesH:
         """
         The pricing object needs to contain the object, the price_date, and the value (price or min_night)!
         """
-        target_col = self.g.get_rolling_col(date1=pric["price_date"], today_col="L")  # Column of this price_date
-        snippet = {
-            "range": target_col + str(self.secrets["flats"][pric["object"]]["pricing_row"]),
-            "values": [
-                [f"""{pric["price"]}"""]
-            ]
-        }
-        data.append(snippet)
+        if self.prices:
+            target_col = self.g.get_rolling_col(date1=pric["price_date"], today_col="L")  # Column of this price_date
+            snippet = {
+                "range": target_col + str(self.secrets["flats"][pric["object"]]["pricing_row"]),
+                "values": [
+                    [f"""{pric["price"]}"""]
+                ]
+            }
+            data.append(snippet)
 
     def add_min_write_snippet(self, pric, data):
         """
         The pricing object needs to contain the object, the price_date, and the value (price or min_night)!
         """
-        target_col = self.g.get_rolling_col(date1=pric["price_date"], today_col="L")  # Column of this price_date
-        snippet = {
-            "range": target_col + str(self.secrets["flats"][pric["object"]]["pricing_row"] + 1),
-            "values": [
-                [f"""{pric["min_nights"]}"""]
-            ]
-        }
-        data.append(snippet)
+        if self.prices:
+            target_col = self.g.get_rolling_col(date1=pric["price_date"], today_col="L")  # Column of this price_date
+            snippet = {
+                "range": target_col + str(self.secrets["flats"][pric["object"]]["pricing_row"] + 1),
+                "values": [
+                    [f"""{pric["min_nights"]}"""]
+                ]
+            }
+            data.append(snippet)
 
     def add_write_snippet(self, booking, data):
         if self.write:
