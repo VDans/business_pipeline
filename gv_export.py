@@ -9,11 +9,12 @@ logging.getLogger().setLevel(logging.INFO)
 db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
 
-OUTPUT_PATH = "G:/My Drive/Legal/Gästeverzeichnis"
+# OUTPUT_PATH = "G:/My Drive/Legal/Gästeverzeichnis"
+OUTPUT_PATH = "/Users/valentindans/Library/CloudStorage/GoogleDrive-office@host-it.at/My Drive/Legal/Gästeverzeichnis"
 
 flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
-date_from = pd.Timestamp(day=1, month=12, year=2023)
-date_to = pd.Timestamp(day=31, month=12, year=2023)
+date_from = pd.Timestamp(day=1, month=1, year=2024)
+date_to = pd.Timestamp(day=31, month=1, year=2024)
 
 for f in flats:
     sql = open("sql/gv_preparation.sql").read()

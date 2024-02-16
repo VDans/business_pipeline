@@ -14,7 +14,7 @@ pd.options.mode.chained_assignment = None
 secrets = json.load(open('config_secrets.json'))
 db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
-g = Google(secrets, secrets["google"]["pricing_workbook_id"])
+g = Google(secrets, secrets["google"]["pricing_workbook_id_horizontal"])
 
 
 def compute_occupancy():
@@ -39,7 +39,7 @@ def compute_occupancy():
     # 2/ Filters
     flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
     bookings = bookings[bookings["object"].isin(flats)]
-    all_dates = list(pd.date_range(start=(pd.Timestamp.today().date() - pd.Timedelta(days=15)), end=(pd.Timestamp.today().date() + pd.Timedelta(days=365))))
+    all_dates = list(pd.date_range(start=(pd.Timestamp.today().date() - pd.Timedelta(days=9)), end=(pd.Timestamp.today().date() + pd.Timedelta(days=180))))
 
     # 3/
     # To be vectorized!
@@ -55,7 +55,7 @@ def compute_occupancy():
 
     # Output Goal
     index_mix = list(it.product(flats, all_dates))
-    out = pd.DataFrame(index_mix).rename(columns = {0: "object", 1: "date"})
+    out = pd.DataFrame(index_mix).rename(columns={0: "object", 1: "date"})
     # Join them:
     out = pd.merge(out, df_date_ranges, on=["object", "date"], how="left").fillna(0)
     # Pivot from long to wide:
@@ -69,7 +69,21 @@ def compute_occupancy():
     g.batch_write_to_cell(data=dat)
 
 
-def add_write_snippet(row_dat, data, headers_rows = 3):
+def add_write_snippet(row_dat, data):
+    # Calculate the A1 notation of where the name of the booking should be.
+    # In this new concept, the name should expand on two rows.
+    target_col = g.get_rolling_col(date1=row_dat["date"], today_col="L")
+    cell_range = target_col + "2"
+    snippet = {
+        "range": cell_range,
+        "values": [
+            [str(round(100 * row_dat["occupancy"], 1)) + "%"]
+        ]
+    }
+    data.append(snippet)
+
+
+def add_write_snippet1(row_dat, data, headers_rows = 3):
     offset_exact = g.excel_date(row_dat["date"])
     offset_first = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15))
     row = int(offset_exact - offset_first) + headers_rows  # Adjusting to the title rows where there's no date

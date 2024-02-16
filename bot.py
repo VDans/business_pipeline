@@ -10,10 +10,12 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 from sqlalchemy.exc import IntegrityError
+from notes_horizontal import NotesH
 from sqlalchemy import create_engine, Table, MetaData, update
 from database_handling import DatabaseHandler
 from zodomus_api import Zodomus
 from google_api import Google
+
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +54,7 @@ def manage_availability():
         channel_name = "Airbnb" if str(data["channelId"]) == "3" else "Booking"
 
         z = Zodomus(secrets=secrets)
-        g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id"])
+        g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id_horizontal"])
         db_engine = create_engine(url=secrets["database"]["url"])
         dbh = DatabaseHandler(db_engine, secrets)
         offset = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15)) - 3  # Rolling window. -3 for 3 headers rows!
@@ -92,7 +94,6 @@ def manage_availability():
 
         # Initiate bookings table
         tbl = Table("bookings", MetaData(), autoload_with=db_engine)
-
         logging.info(f"Step 1 finishes at timestamp {time.time() - start_time} seconds.")
 
         if reservation_status_z == '1':  # New
@@ -112,25 +113,8 @@ def manage_availability():
             z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=date_from, date_to=date_to, availability=0)
             z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=0)
             logging.info("Availability has been closed in both channels")
-
             logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
 
-            # In the Google Pricing Sheet:
-            # Write the name of the guest:
-            try:
-                part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
-            except IndexError as ie:
-                logging.error(f"ERROR: {ie}")
-                part2 = ""
-            short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
-            try:
-                dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
-                dat = []
-                dates_range.apply(add_write_snippet, args=(g, dat, flat_name, short_name))
-                g.batch_write_to_cell(data=dat)
-
-            except Exception as ex:
-                logging.warning(f"Could not write to sheet: {ex}")
             logging.info(f"Step 3 finishes at timestamp {time.time() - start_time} seconds.")
 
         elif reservation_status_z == '2':  # Modified
@@ -170,47 +154,8 @@ def manage_availability():
 
                 logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
 
-                # Unmerge the cells based on the first one:
-                try:
-                    g.unmerge_cells2(old_date_from, old_date_to, flat_name, offset=offset)
-                    g.write_note2(old_date_from, old_date_from, flat_name, "", offset=offset)
-                except Exception as ex:
-                    logging.warning(f"Could not unmerge and remove the note: {ex}")
-
-                # Remove the "Booked" in the Google Sheet and replace with 4 nights by default
-                try:
-                    dates_range = pd.Series(pd.date_range(start=old_date_from, end=(old_date_to - pd.Timedelta(days=1))))
-                    dat = []
-                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, 4))
-                    g.batch_write_to_cell(data=dat)
-                except Exception as ex:
-                    logging.warning(f"Could not write to sheet: {ex}")
-
-                logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
-
-                # Write the "Booked" in the Google Sheet
-                n_guests = get_n_guests(reservation_z)
-
-                try:
-                    # Write the name of the guest:
-                    try:
-                        part2 = " " + reservation_z["reservations"]["customer"]["lastName"].title()[0] + "."
-                    except IndexError as ie:
-                        part2 = ""
-                    short_name = f"""{reservation_z["reservations"]["customer"]["firstName"].title()}{part2} ({channel_name[0]})"""
-                    dates_range = pd.Series(pd.date_range(start=new_date_from, end=(new_date_to+pd.Timedelta(days=-1))))
-                    dat = []
-                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, short_name))
-                    g.batch_write_to_cell(data=dat)
-
-                except Exception as ex:
-                    logging.warning(f"Could not write to sheet: {ex}")
-
-                logging.info(f"Wrote '{channel_name}' within the pricing Google Sheet. Added info note.")
-
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the modification: {ke}")
-                # body = f"ERROR: Could not process modification"
 
         elif reservation_status_z == '3':  # Cancelled
             logging.info(f"Cancelled booking {str(data['reservationId'])} in {flat_name}")
@@ -257,29 +202,15 @@ def manage_availability():
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=date_from, date_to=date_to+pd.Timedelta(days=-1), availability=1)
                 logging.info("Availability has been opened in both channels")
 
-                # Unmerge the cells based on the first one:
-                try:
-                    g.unmerge_cells2(date_from, date_to, flat_name, offset=offset)
-                    g.write_note2(date_from, date_to, flat_name, "", offset=offset)
-                    logging.info("Removed the booking tag within the pricing Google Sheet. Overwrote the note.")
-
-                except Exception as ex:
-                    logging.warning(f"Could not unmerge and remove the note: {ex}")
-
-                # Remove the "Booked" in the Google Sheet and replace with 4 nights by default
-                try:
-                    dates_range = pd.Series(pd.date_range(start=date_from, end=(date_to - pd.Timedelta(days=1))))
-                    dat = []
-                    dates_range.apply(add_write_snippet, args=(g, dat, flat_name, 4))
-                    g.batch_write_to_cell(data=dat)
-                except Exception as ex:
-                    logging.warning(f"Could not write to sheet: {ex}")
-
             except KeyError as ke:
                 logging.error(f"ERROR in the processing of the cancellation: {ke}")
 
         else:
             logging.error(f"reservationStatus not understood: {reservation_status_z}")
+
+        # Rewrite all sheet, whatever happened:
+        n = NotesH(secrets=secrets, google=g)
+        n.write_notes()
 
         dbh.close_engine()
 
@@ -291,96 +222,6 @@ def manage_availability():
     logging.info(f"This call lasted {end_time - start_time} seconds")
 
     return str("All Good!")
-
-
-@app.route('/pricing', methods=['POST'])
-@limiter.limit("30 per minute")
-@limiter.limit("1 per second")
-def get_prices():
-    """
-    This url is called by the Google Webhook when a change occurs in the pricing Google Sheet.
-    """
-    start_time = time.time()
-
-    data = request.json
-    logging.info("--------------------------------------------------------------------------------------------------------")
-    logging.info("PRICING New Request-------------------------------------------------------------------------------------")
-
-    z = Zodomus(secrets=secrets)
-
-    try:
-        # Find out the booking and airbnb propertyId
-        flat_name = data["flat_name"]
-        property_id_airbnb = secrets["flats"][flat_name]["pid_airbnb"]
-        room_id_airbnb = secrets["flats"][flat_name]["rid_airbnb"]
-        rate_id_airbnb = secrets["flats"][flat_name]["rtid_airbnb"]
-        property_id_booking = secrets["flats"][flat_name]["pid_booking"]
-        room_id_booking = secrets["flats"][flat_name]["rid_booking"]
-        rate_id_booking = secrets["flats"][flat_name]["rtid_booking"]
-
-    except KeyError:
-        logging.error(f"Could not find flat name: {data['flat_name']}, is it possible you're adding columns?")
-
-        return str("Thanks Google.")
-
-    for i in range(len(data["new_value"])):
-        try:
-            # Clean Date and Value
-            date = pd.Timestamp(data["date"][i][0])
-            value = int(data["new_value"][i][0])  # Price and min nights as integers. No real need for decimals...
-
-            logging.info(f"Extracting data: Property: {data['flat_name']} - Date: {date.strftime('%Y-%m-%d')} - {data['value_type']}: {value}")
-
-            # Pushing data through Zodomus:
-            if data["value_type"] == "Price":
-                logging.info(f"Modifying price: Pushing to channels")
-                response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
-                time.sleep(1)
-                response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
-
-            elif data["value_type"] == "Min.":
-                if str(value) == "0":
-                    # 3. If min_nights = 0: Close the room for the night in both channels
-                    logging.info("Min. Nights set to 0. Closing the room.")
-                    z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=0)
-                    time.sleep(1)
-                    z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=0)
-
-                else:
-                    logging.info(f"Making sure availability is open before pushing min. nights value")
-                    # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
-                    z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=date, date_to=(date + pd.Timedelta(days=1)), availability=1)
-                    time.sleep(1)
-                    z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=date, date_to=date, availability=1)
-
-                    # 2. Change the minimum nights on the platforms
-                    # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
-                    # Therefore, you also have to communicate the price next to the min nights requirements...
-                    try:
-                        right_cell_value = int(data["rightCellValue"][i][0])
-                    except Exception as ex:
-                        right_cell_value = 500
-                        logging.warning(f"No price is available! Setting price to 500 while waiting for a better price: {ex}")
-
-                    logging.info(f"Pushing min. nights value")
-                    z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, min_nights=value)
-                    time.sleep(1)
-                    z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=right_cell_value, min_nights=value)  # Fucking hate this...
-
-            else:
-                response1 = response2 = "value_type data not one of 'Price' or 'Min.'"
-                logging.warning(f"Response: {response1}")
-
-        except ValueError as ve:
-            if data["new_value"][i][0] in ["Booked", "Airbnb", "Booking.com", "Booking"]:
-                logging.warning(f"New '{data['new_value'][i][0]}' value entered. Skipping the logic.")
-            else:
-                logging.warning(f"Value {data['new_value'][i][0]} entered is not a valid input. Skipping the logic: {ve}")
-
-    end_time = time.time()
-    logging.info(f"This took {end_time - start_time} seconds")
-
-    return str("Thanks Google!")
 
 
 @app.route('/online-checkin', methods=['POST'])
@@ -604,6 +445,8 @@ def check_in_online():
 def get_code():
     """
     This url is called by the Google Webhook when a change occurs in the Lockboxes Codes' Google Sheet.
+
+    THIS IS SHIT AND NOT WORKING. FIX.
     """
     start_time = time.time()
 
@@ -696,6 +539,19 @@ def add_write_snippet(booking_date, google, data, flat, value):
     cell_range = google.get_rolling_range(unit_id=flat, date1=booking_date, col=secrets["flats"][flat]["pricing_col"], headers_rows=3)
     snippet = {
         "range": cell_range,
+        "values": [
+            [value]
+        ]
+    }
+    data.append(snippet)
+
+
+def add_write_snippet_h(booking_date, google, data, flat, value):
+    # Calculate the A1 notation of where the name of the booking should be.
+    # In this new concept, the name should expand on two rows.
+    target_col = google.get_rolling_col(date1=booking_date, today_col="L")
+    snippet = {
+        "range": target_col + str(secrets["flats"][flat]["pricing_row"]),
         "values": [
             [value]
         ]

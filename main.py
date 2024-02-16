@@ -1,26 +1,37 @@
 import json
-import logging
-
 import pandas as pd
-from sqlalchemy import create_engine, Table, MetaData, update
-from database_handling import DatabaseHandler
-from zodomus_api import Zodomus
+from sqlalchemy import create_engine, types
 
 secrets = json.load(open('config_secrets.json'))
 db_engine = create_engine(url=secrets["database"]["url"])
-dbh = DatabaseHandler(db_engine, secrets)
 
-z = Zodomus(secrets=secrets)
+# Preparing the initial pricing table
+# Read original from Pricing sheet 1.0:
+df = pd.read_excel("/Users/valentindans/Downloads/pricing_data.xlsx", header=None, index_col=None)
+df = df.fillna(0)
+df = df.T.reset_index()
+df1 = pd.melt(frame=df, id_vars=["level_0", "level_1"], var_name="price_date")
+df2 = df1.pivot(index=["price_date", "level_0"], columns='level_1', values="value")
+df2 = df2.reset_index()
 
-z.set_availability(channel_id="1",
-                   unit_id_z="11015792",
-                   room_id_z="1101579201",
-                   date_from=pd.Timestamp(day=4, month=1, year=2024),
-                   date_to=pd.Timestamp(day=12, month=1, year=2024),
-                   availability=0)
-z.set_availability(channel_id="3",
-                   unit_id_z="994746383930250287",
-                   room_id_z="99474638393025028701",
-                   date_from=pd.Timestamp(day=4, month=1, year=2024),
-                   date_to=pd.Timestamp(day=12, month=1, year=2024),
-                   availability=0)
+# Rename correctly:
+df2 = df2.rename(columns={"level_0": "object", "Min.": "min_nights", "Price": "price"})
+df2["change_date"] = pd.Timestamp.now()
+df2["overwritten"] = False
+
+# Correct data
+# Convert dates
+df2['price_date'] = [pd.to_datetime(d).date() for d in df2['price_date']]
+
+# Non-numerical to 0 & protect prices in closed nights:
+df2['min_nights'] = pd.to_numeric(df2['min_nights'], errors='coerce').fillna(0)
+df2['min_nights'] = [int(m) for m in df2['min_nights']]
+df2.loc[df2['min_nights'] == 0, "price"] = 1000
+
+with db_engine.begin() as conn:
+    df2.to_sql(
+        index=None,
+        con=conn,
+        name='pricing',
+        if_exists='append'
+    )

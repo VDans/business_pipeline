@@ -210,7 +210,6 @@ class NotesH:
 
     def add_merge_snippet(self, booking, merg, internal_sheet_id):
         if self.merge:
-
             target_col = self.g.get_rolling_col(date1=booking["reservation_start_adjusted"], today_col="L")
 
             snippet = {

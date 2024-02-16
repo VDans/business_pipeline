@@ -1,5 +1,6 @@
 import logging
 import json
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -98,6 +99,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
     for i in range(13):
         logging.info(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
+        time.sleep(1)
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
         try:
@@ -106,6 +108,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
             logging.error(f"TypeError: Cannot go further than {init_date}. Moving on with price checks until that date.")
             break
         init_date += pd.Timedelta(days=30)
+
 
     # Make sure the dates ranges are the same:
     prices_gsheet = [m1 for m1 in prices_gsheet if m1[0] in [m2[0] for m2 in price_z]]
@@ -121,12 +124,14 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
         if p_g < 30:
             logging.info(f"PRICE TOO LOW: {date} - Price {p_g} detected on the Google Sheet. Setting price at 30, not lower")
             # Google is too low. Setting to 30.
+            time.sleep(1)
             response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=30).json()
             logging.info(f"Pushed new price 30 to {channel_name} with response: {response['status']['returnMessage']}")
 
         if p_g != p_z:
             logging.info(f"DELTA: {date}: {p_g} (User) vs {p_z} (Platform)")
             # Google is the absolute truth
+            time.sleep(1)
             response = z.set_rate(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, price=p_g).json()
             logging.info(f"Pushed new price {p_g} to {channel_name} with response: {response['status']['returnMessage']}")
 
@@ -193,6 +198,7 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
     for i in range(13):
         logging.info(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
+        time.sleep(1)
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
         room_data = [r for r in min_z_response["rooms"] if r["id"] == room_id_z][0]["dates"]
         try:
@@ -217,6 +223,7 @@ def adjust_min_nights(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate
             logging.info(f"DELTA: {date}: {m_night_g} vs {m_night_z}")
 
             # Google is the absolute truth
+            time.sleep(1)
             if channel_id_z == "1":
                 response = z.set_minimum_nights(channel_id=channel_id_z, unit_id_z=unit_id_z, room_id_z=room_id_z, rate_id_z=rate_id_z, date_from=date, min_nights=m_night_g).json()
             else:

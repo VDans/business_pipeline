@@ -29,10 +29,9 @@ def hello_world():
 @app.route('/pricing_sheet', methods=['POST'])
 def get_prices():
     """
-    NEW IN DEVELOPMENT: This endpoint also arrives from Google, but is now meant to update prices on the DB table, no more to push on the platform.
-    The prices will ideally get pushed with a confirmation button, in "batches" instead of individual prices.
-    This call then uploads to the DB the new changes.
-    A task then transmits the DB prices to the platforms.
+    This endpoint arrives from Google, and is meant to update prices on the DB table, and then push to the platforms.
+    The prices get pushed with a confirmation button, in "batches".
+    This call then uploads to the DB the new changes, and then pushes live to the platforms.
     """
     start_time = time.time()
 
@@ -62,7 +61,7 @@ def get_prices():
             df_google = pd.concat([df_google, pd.DataFrame(dict_temp)], ignore_index=True)
 
     # Take out the price dates where there is a booking:
-    df_google.loc[df_google['min_nights'] == "", "price"] = -1
+    df_google.loc[df_google['min_nights'] == "", "price"] = 1000
     df_google.loc[df_google['min_nights'] == "", "min_nights"] = 0
 
     # Filter after today
@@ -79,7 +78,7 @@ def get_prices():
     # Update is not a viable solution, as sometimes you need to add rows with new dates!
     # Delete where the index matches:
     if len(df_diff) > 0:
-        logging.info(f"Delta Rows Found: {df_diff}")
+        app.logger.info(f"Delta Rows Found: {df_diff}")
         with db_engine.begin() as conn:
             for i in range(len(df_diff)):
                 data1 = {
@@ -97,7 +96,7 @@ def get_prices():
                 }
                 delete_query = delete(pricing_tbl).where(pricing_tbl.c.object == data1["flat_name"], pricing_tbl.c.price_date == data1["date"])
                 conn.execute(delete_query)
-                logging.info(f"Object {data1['flat_name']} on the {data1['date']}: New price of {data1['new_value']} and min. nights of {data2['new_value']}")
+                app.logger.info(f"Object {data1['flat_name']} on the {data1['date']}: New price of {data1['new_value']} and min. nights of {data2['new_value']}")
 
                 # 2. DATABASE TO PLATFORMS:
                 # Push first the minimum nights:
@@ -242,33 +241,26 @@ def m_nights_to_platform(z, data):
         # 3. If min_nights = 0: Close the room for the night in both channels
         logging.info("Min. Nights set to 0. Closing the room.")
         z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=data["date"], date_to=(data["date"] + pd.Timedelta(days=1)), availability=0)
-        time.sleep(1)
         z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=data["date"], date_to=data["date"], availability=0)
 
     else:
         logging.info("Min. Nights is not 0. Opening the room.")
-        # 1. Make sure the dates are open. Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
+        # 1. Make sure the dates are open.
+        # Why? Because if min nights was on 0, and you change the min nights, the nights stay closed.
         z.set_availability(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, date_from=data["date"], date_to=(data["date"] + pd.Timedelta(days=1)), availability=1)
-        time.sleep(1)
         z.set_availability(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, date_from=data["date"], date_to=data["date"], availability=1)
 
         # 2. Change the minimum nights on the platforms
         # UNFORTUNATELY the shitty Airbnb API requires a price push at the same time as the minimum nights' push.
         # Therefore, you also have to communicate the price next to the min nights requirements...
-        try:
-            right_cell_value = int(data["rightCellValue"])
-        except Exception as ex:
-            right_cell_value = 500
-            logging.warning(f"No price is available! Setting price to 500 while waiting for a better price: {ex}")
-
         logging.info(f"Pushing min. nights value")
         z.set_minimum_nights(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=data["date"], min_nights=data["new_value"])
-        time.sleep(1)
-        z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=data["date"], price=right_cell_value, min_nights=data["new_value"])  # Fucking hate this...
+        z.set_airbnb_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=data["date"], price=1000, min_nights=data["new_value"])  # Fucking hate this...
 
     logging.info("Pushed new min. nights")
     end_time = time.time()
     logging.info(f"This took {end_time - start_time} seconds")
+    app.logger.info(f"Min nights call took {end_time - start_time} seconds")
 
 
 def price_to_platform(z, data):
@@ -297,12 +289,12 @@ def price_to_platform(z, data):
     if data["value_type"] == "Price":
         logging.info(f"Modifying price: Pushing to channels")
         response1 = z.set_rate(channel_id="1", unit_id_z=property_id_booking, room_id_z=room_id_booking, rate_id_z=rate_id_booking, date_from=date, price=value)
-        time.sleep(1)
         response2 = z.set_rate(channel_id="3", unit_id_z=property_id_airbnb, room_id_z=room_id_airbnb, rate_id_z=rate_id_airbnb, date_from=date, price=value)
 
     logging.info("Pushed new price")
     end_time = time.time()
     logging.info(f"This took {end_time - start_time} seconds")
+    app.logger.info(f"Price call took {end_time - start_time} seconds")
 
 
 if __name__ == '__main__':

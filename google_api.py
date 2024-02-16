@@ -290,6 +290,22 @@ class Google:
                                       internal_sheet_id=920578163)
         return response
 
+    def unmerge_cells_h2(self, date_from: pd.Timestamp, date_to: pd.Timestamp, flat_name: str, offset=45075):
+        """
+        unmerge cells in the Google Pricing Sheet from two dates
+        """
+        start_row_incl = self.excel_date(date_from) - offset - 1  # -1, because indexing starts at 0 for the formatting!
+        end_row_excl = self.excel_date(date_to) - offset - 1  # -1, because indexing starts at 0 for the formatting!
+        start_col_incl = self.col2num(self.secrets["flats"][flat_name]["pricing_col"])
+        end_col_excl = start_col_incl + 1
+
+        response = self.unmerge_cells(n_row_start=start_row_incl,
+                                      n_row_end=end_row_excl,
+                                      n_col_start=start_col_incl,
+                                      n_col_end=end_col_excl,
+                                      internal_sheet_id=920578163)
+        return response
+
     def unmerge_cells(self, n_row_start: int, n_row_end: int, n_col_start: int, n_col_end: int, internal_sheet_id: int):
         """
         Merge a cells range

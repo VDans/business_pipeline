@@ -40,8 +40,7 @@ def check_bookings():
     bookings = dbh.query_data(sql=sql, dtypes={"reservation_start": pd.Timestamp, "reservation_end": pd.Timestamp})
 
     # Get list of flats
-    # flats = list(bookings["object"].unique())
-    flats = ["HDS2"]
+    flats = list(bookings["object"].unique())
     z = Zodomus(secrets=secrets)
 
     for flat in flats:
