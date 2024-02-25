@@ -37,7 +37,7 @@ def compute_occupancy():
     bookings = dbh.query_data(sql=sql, dtypes={"reservation_start": pd.Timestamp, "reservation_end": pd.Timestamp})
 
     # 2/ Filters
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
+    flats = [f[0] for f in secrets["flats"].items() if "pricing_row" in f[1]]
     bookings = bookings[bookings["object"].isin(flats)]
     all_dates = list(pd.date_range(start=(pd.Timestamp.today().date() - pd.Timedelta(days=9)), end=(pd.Timestamp.today().date() + pd.Timedelta(days=180))))
 

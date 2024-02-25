@@ -1,0 +1,175 @@
+{
+  "data": {
+    "attributes": {
+      "id": "45925183-5503-4958-825c-87395b34b128",
+      "meta": {
+        "ruid": "UmFuZG9tSVYkc2RlIyh9YU4cyXdXYzTIMCK05P6JiQNjxxubvLbuTyKbqaTC2ks2zqrs/yGCa60q2zWm1eicAkHU6OsjHqQaf14LS9x0GZA="
+      },
+      "status": "new",
+      "services": [],
+      "currency": "GBP",
+      "amount": "915.48",
+      "agent": "None",
+      "inserted_at": "2024-02-25T17:13:02.982567",
+      "unique_id": "BDC-4195422067",
+      "system_id": "4f5c0ebd",
+      "ota_name": "BookingCom",
+      "channel_id": "1457d1af-4bf6-467c-ac0d-eed98f833e3c",
+      "booking_id": "b812cbe7-5565-4f20-b876-6f787a0021e4",
+      "property_id": "96387fc7-ba04-4bdd-b487-8d71411f0ce9",
+      "occupancy": {
+        "children": 0,
+        "adults": 1,
+        "infants": 0,
+        "ages": []
+      },
+      "notes": "\nMeal Plan: Breakfast costs GBP14 per person per night.\nDinner costs GBP35 per person per night.\nPayment Collect: hotel collect\nOTA Commission: 0.00",
+      "arrival_date": "2024-02-25",
+      "arrival_hour": None,
+      "customer": {
+        "meta": {
+          "is_genius": True
+        },
+        "name": "Valentin",
+        "zip": None,
+        "address": "frfr",
+        "country": "AT",
+        "city": "wfewf",
+        "language": None,
+        "company": None,
+        "mail": "vdans.968232@guest.booking.com",
+        "phone": "+43 660 1644192",
+        "surname": "D'ans"
+      },
+      "departure_date": "2024-02-26",
+      "deposits": None,
+      "guarantee": {
+        "token": None,
+        "card_number": "534633******8164",
+        "card_type": "MC",
+        "cardholder_name": "Valentin D'ans",
+        "cvv": "***",
+        "expiration_date": "01/2029",
+        "is_virtual": False
+      },
+      "payment_collect": "property",
+      "payment_type": "credit_card",
+      "rooms": [
+        {
+          "meta": {
+            "rate_plan_code": 16385048,
+            "room_type_code": "586818902",
+            "cancel_penalties": [
+              {
+                "amount": "315.48",
+                "currency": "GBP",
+                "from": "2024-02-25T17:11:57"
+              }
+            ],
+            "days_breakdown": [
+              {
+                "amount": "315.48",
+                "date": "2024-02-25",
+                "promotion": None,
+                "rate_code": 16385048,
+                "rate_plan": "11d1b33c-eb12-4a29-8c8a-98ad0bacf3cf"
+              }
+            ],
+            "additional_details": [],
+            "booking_com_room_index": 176,
+            "meal_plan": "Breakfast costs GBP14 per person per night.\nDinner costs GBP35 per person per night.",
+            "policies": "Children and Extra Bed Policy: Children of any age are allowed. You haven"t added any cots. You haven"t added any extra beds. The maximum number of guests is 1.  Deposit Policy: The guest will be charged a prepayment of the total price of the reservation at any time.  Cancellation Policy: The guest will be charged the total price of the reservation if they cancel at any time.",
+            "promotion": [],
+            "room_remarks": [],
+            "smoking_preferences": "Smoking"
+          },
+          "taxes": [
+            {
+              "is_inclusive": False,
+              "name": "Service charge",
+              "nights": 1,
+              "persons": 1,
+              "price_mode": "Per booking",
+              "price_per_unit": "150.00",
+              "total_price": "150.00",
+              "type": "Service Charge"
+            },
+            {
+              "is_inclusive": false,
+              "name": "Cleaning fee",
+              "nights": 1,
+              "persons": 1,
+              "price_mode": "Per booking",
+              "price_per_unit": "150.00",
+              "total_price": "150.00",
+              "type": "Service Charge"
+            },
+            {
+              "is_inclusive": false,
+              "name": "Electricity fee",
+              "nights": 1,
+              "persons": 1,
+              "price_mode": "Per booking",
+              "price_per_unit": "150.00",
+              "total_price": "150.00",
+              "type": "Service Charge"
+            },
+            {
+              "is_inclusive": False,
+              "name": "Bed linens fee",
+              "nights": 1,
+              "persons": 1,
+              "price_mode": "Per booking",
+              "price_per_unit": "150.00",
+              "total_price": "150.00",
+              "type": "Service Charge"
+            }
+          ],
+          "services": [],
+          "amount": "915.48",
+          "days": {
+            "2024-02-25": "315.48"
+          },
+          "booking_room_id": "29cb2383-a4a5-46c6-ac10-629e3ebbdb6b",
+          "rate_plan_id": "11d1b33c-eb12-4a29-8c8a-98ad0bacf3cf",
+          "room_type_id": "49589fb9-0a10-42ef-9ad9-9d3a4981a578",
+          "guests": [
+            {
+              "name": "Valentin",
+              "surname": "D'ans"
+            }
+          ],
+          "occupancy": {
+            "children": 0,
+            "adults": 1,
+            "infants": 0,
+            "ages": []
+          },
+          "ota_commission": "0.00",
+          "checkin_date": "2024-02-25",
+          "checkout_date": "2024-02-26",
+          "is_cancelled": False
+        }
+      ],
+      "secondary_ota": None,
+      "acknowledge_status": "pending",
+      "ota_commission": "0.00",
+      "ota_reservation_code": "4195422067",
+      "raw_message": {"services":[],"ResGlobalInfo":{"GuestCounts":[],"HotelReservationIDs":[{"HotelReservationID":{"@ResID_Value":"4195422067","@ResID_Type":"14","@ResID_Source":"BOOKING.COM","@ResID_SourceContext":"5868189"}},{"HotelReservationID":{"@ResID_Value":"4f5c0ebd","@ResID_Type":"18","@ResID_Source":"BOOKING.COM","@ResID_SourceContext":""}}],"Comments":[],"Total":{"currency_code":"GBP","amount_after_tax":"","decimal_places":2},"Profiles":[{"ProfileInfo":{"Profile":{"Customer":{"Email":"vdans.968232@guest.booking.com","PersonName":{"GivenName":"Valentin","Surname":"D\"ans"},"Address":{"CountryName":{"@Code":"AT"},"PostalCode":"","CityName":"wfewf","AddressLine":"frfr","CompanyName":""},"Telephone":{"@PhoneNumber":"+43 660 1644192"}}}}}],"Guarantee":{"GuaranteesAccepted":{"GuaranteeAccepted":{"PaymentCard":{"Errors":[],"@VCCExpirationDate":"","CardHolderName":"Valentin D\"ans","@CardNumber":"534633******8164","@ExpireDate":"0129","@CardCode":"MC","@SeriesCode":"***","@CurrentBalance":"","@DecimalPlaces":"","@CurrencyCode":"","@EffectiveDate":"","Token":"***","Warnings":[]}}}},"TotalCommissions":{"Comment":"This is the total commission amount calculated by Booking.com","CommissionPayableAmount":{"amount":0,"currency_code":"GBP","decimal_places":2}},"DepositPayments":null},"TPA_Extention":{"flags":[{"name":"booker_is_genius"}],"booker":null},"RoomStays":[{"RoomStay":{"room_index":176,"GuestCounts":[{"GuestCount":{"@AgeQualifyingCode":10,"@Age":null,"@Count":1}}],"Comments":[],"Total":{"taxes":[{"code":"14","type":"Exclusive","amount":"15000","currency_code":"GBP","decimal_places":2,"charge_frequency":12,"tax_description":"Service charge"},{"code":"14","type":"Exclusive","amount":"15000","currency_code":"GBP","decimal_places":2,"charge_frequency":12,"tax_description":"Cleaning fee"},{"code":"14","type":"Exclusive","amount":"15000","currency_code":"GBP","decimal_places":2,"charge_frequency":12,"tax_description":"Electricity fee"},{"code":"14","type":"Exclusive","amount":"15000","currency_code":"GBP","decimal_places":2,"charge_frequency":12,"tax_description":"Bed linens fee"}],"currency_code":"GBP","amount_after_tax":"","decimal_places":2},"TPA_Extensions":null,"RoomRates":{"Rates":[{"rate_plan_code":16385048,"currency_code":"GBP","amount_after_tax":"","decimal_places":2,"amount_before_tax":"31548","effective_date":"2024-02-25"}],"TPA_Extensions":{"RateRewrite":[],"BookingCondition":"Breakfast costs GBP14 per person per night.\\nDinner costs GBP35 per person per night. Children and Extra Bed Policy: Children of any age are allowed. You haven\"t added any cots. You haven\"t added any extra beds. The maximum number of guests is 1.  Deposit Policy: The guest will be charged a prepayment of the total price of the reservation at any time.  Cancellation Policy: The guest will be charged the total price of the reservation if they cancel at any time. "}},"CancelPenalties":[{"from":"2024-02-25T17:11:57+00:00","amount":"31548","currency_code":"GBP","decimal_places":2,"policy_code":"1"}],"RoomTypes":[{"RoomType":{"room_type_code":"586818902","AdditionalDetails":[],"RoomDescription":{"MealPlan":"Breakfast costs GBP14 per person per night.\\nDinner costs GBP35 per person per night.","Text":"This single room features a tea/coffee maker, fireplace and dishwasher.","@Name":"Single Room - Non-refundable","MaxChildren":0}}}],"ServiceRPHs":[],"SpecialRequests":[{"SpecialRequest":{"Text":"Smoking","@Name":"smoking preference"}}],"ResGuestRPHs":[{"ResGuestRPH":{"@RPH":1}}],"RatePlans":[{"RatePlan":{"Commission":{"CommissionPayableAmount":{"amount":0,"currency_code":"GBP","decimal_places":2}}}}],"BasicPropertyInfo":{"@HotelCode":"5868189"}}}],"ResGuests":[{"ResGuest":{"GivenName":"Valentin","Surname":"D\"ans","@ResGuestRPH":1}}]}"
+    },
+    "id": "45925183-5503-4958-825c-87395b34b128",
+    "type": "booking_revision",
+    "relationships": {
+      "data": {
+        "property": {
+          "id": "96387fc7-ba04-4bdd-b487-8d71411f0ce9",
+          "type": "property"
+        },
+        "booking": {
+          "id": "b812cbe7-5565-4f20-b876-6f787a0021e4",
+          "type": "booking"
+        }
+      }
+    }
+  }
+}

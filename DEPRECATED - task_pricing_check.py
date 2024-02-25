@@ -19,7 +19,8 @@ db_engine = create_engine(url=secrets["database"]["url"])
 dbh = DatabaseHandler(db_engine, secrets)
 logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
-flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
+# flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
+flats = ["LEG6"]
 
 
 def check_prices():

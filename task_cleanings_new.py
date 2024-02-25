@@ -23,7 +23,7 @@ def task_cleaning_new():
     bookings = dbh.query_data(sql=sql, dtypes={"n_guests": int, "reservation_start_adjusted": pd.Timestamp, "reservation_end": pd.Timestamp})
     quota = 0
 
-    flats = [f[0] for f in secrets["flats"].items() if f[1]["pid_booking"] != ""]
+    flats = [f[0] for f in secrets["flats"].items() if "cleaning_workbook_id" in f[1]]
     # cleaning_sheets = list(set([secrets["flats"][f]["cleaning_workbook_id"] for f in flats if secrets["flats"][f]["cleaning_workbook_id"] != ""]))
     # FOR NOW ONLY FATMA & LEON!
     cleaning_sheets = ["1tbWy6dMqEp4zKIJquKJhpKBdfSqiiEVufvQ0on3dRss", "1uykPKNoVBzj5seAuiaYKUBmdK3W5i2ZyabDTp3K1MJg"]
@@ -43,7 +43,7 @@ def task_cleaning_new():
         logging.info(f"Cleared All Infos on the Sheet")
 
         # Find the flats in this sheet
-        cs_flats = [f for f in secrets['flats'] if secrets["flats"][f]["cleaning_workbook_id"] == cs]
+        cs_flats = [f for f in flats if secrets["flats"][f]["cleaning_workbook_id"] == cs]
 
         for flat in cs_flats:
             # Filter the bookings:

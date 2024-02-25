@@ -36,6 +36,9 @@ class NotesH:
         bookings = bookings[bookings["object"].isin(flats)]
         pricing = pricing[pricing["object"].isin(flats)]
 
+        # Get weekends:
+        fridays = self.get_weekends()
+
         # Clear workbook:
         self.g.clear_range(cell_range="C3:ZZ1000")
         self.g.write_note(0, 998, 0, 1000, "", 0)
@@ -51,6 +54,7 @@ class NotesH:
 
         # Filter the bookings:
         # Prepare the batchRequest: for each reservation end, create a batch snippet, append it to the data dict.
+        fridays.apply(self.add_weekend_color_snippet, axis=1, args=(clr, 0))
         pricing.apply(self.add_price_write_snippet, axis=1, args=(dat,))  # For prices
         pricing.apply(self.add_min_write_snippet, axis=1, args=(dat,))  # For min nights
         bookings.apply(self.add_write_snippet, axis=1, args=(dat,))  # For bookings
@@ -298,3 +302,55 @@ class NotesH:
 
         else:
             pass
+
+    def add_weekend_color_snippet(self, friday_date, clr, internal_sheet_id):
+        """
+        Add one weekend (2 days).
+        Based on Friday, identify column + Saturday column
+        """
+
+        if self.color:
+            r = 239
+            g = 239
+            b = 239
+            a = 255
+
+            # Which column for the friday?
+            friday_col = self.g.get_rolling_col(date1=friday_date[0], today_col="L")
+            snippet = {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": internal_sheet_id,
+                            "startRowIndex": 0,
+                            "endRowIndex": 140,  # Should be 2 rows wide.
+                            "startColumnIndex": self.g.col2num(friday_col),
+                            "endColumnIndex": self.g.col2num(friday_col) + 2
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "backgroundColor": {
+                                    "red": r/255,
+                                    "green": g/255,
+                                    "blue": b/255,
+                                    "alpha": a/255
+                                }
+                            }
+                        },
+                        "fields": "userEnteredFormat(backgroundColor)"
+                    }
+                }
+            clr.append(snippet)
+
+        else:
+            pass
+
+    @staticmethod
+    def get_weekends():
+        """
+        Get list of all weekends within 180 days.
+        """
+        # Get all days:
+        all_days = list(pd.date_range(start=pd.Timestamp.now() - pd.Timedelta(days=7), end=pd.Timestamp.now() + pd.Timedelta(days=180)))
+        # Filter weekends only
+        fridays = pd.DataFrame([f for f in all_days if f.weekday() == 4])
+        return fridays

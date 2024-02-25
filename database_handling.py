@@ -1,5 +1,4 @@
 import logging
-
 import pandas as pd
 
 
@@ -7,46 +6,47 @@ class DatabaseHandler:
     def __init__(self, db_engine, secrets):
         self.db_engine = db_engine
         self.secrets = secrets
-
         self.curs = self.db_engine.raw_connection().cursor()
 
-    def upload_reservation(self, channel_id_z, flat_name, reservation_z):
+    def upload_reservation(self, revision, room_position, booking_id):
         logging.info(f"Starting reservation upload")
-        out = self.clean_reservation_z(channel_id_z, flat_name, reservation_z)
+        out = self.clean_reservation(revision, room_position, booking_id)
 
         # Check if the booking_id is already in the DB with the status 'OK':
-        duplicate = self.query_data(f"SELECT booking_id FROM bookings WHERE status = 'OK' AND booking_id = '{reservation_z['reservations']['reservation']['id']}'")
-        if len(duplicate["booking_id"]) == 0:
-            out.to_sql(
-                index=False,
-                con=self.db_engine,
-                name='bookings',
-                if_exists='append'
-            )
-        else:
-            logging.warning(f"This booking_id is already on the DB with status OK!")
+        duplicate = self.query_data(f"SELECT booking_id FROM bookings WHERE status = 'OK' AND booking_id = '{booking_id}'")
+        # Temporary freeze for the staging period:
+#        if len(duplicate["booking_id"]) == 0:
+#                out.to_sql(
+#                index=False,
+#                con=self.db_engine,
+#                name='bookings',
+#                if_exists='append'
+#            )
+#        else:
+#            logging.warning(f"This booking_id is already on the DB with status OK!")
 
-    def clean_reservation_z(self, channel_id_z, flat_name, reservation_z):
-        data = reservation_z["reservations"]
+    def clean_reservation(self, revision, room_position, booking_id):
+        data = revision["data"]
+        room_id = data["attributes"]["rooms"][room_position]["room_type_id"]
 
-        # Booking ID
+        # Which flat corresponds to this room_id?
         try:
-            booking_id = data["reservation"]["id"]
+            flat_name = [fn for fn in self.secrets['flats'] if self.secrets["flats"][fn]["rid_channex"] == room_id][0]
         except Exception as ex:
-            booking_id = None
-            logging.error(f"Could not find booking ID with exception: {ex}")
+            flat_name = "UNKNOWN"
+            logging.error(f"Could not find flat_name with exception: {ex}")
 
         # Booking Date
         try:
-            booking_date = data["reservation"]["bookedAt"]
+            booking_date = pd.Timestamp.now()
         except Exception as ex:
             booking_date = None
             logging.error(f"Could not find booking_date with exception: {ex}")
 
         # Reservation Dates
         try:
-            reservation_start = pd.Timestamp(data["rooms"][0]["arrivalDate"])
-            reservation_end = pd.Timestamp(data["rooms"][0]["departureDate"])
+            reservation_start = pd.Timestamp(data["attributes"]["arrival_date"]).date()
+            reservation_end = pd.Timestamp(data["attributes"]["departure_date"]).date()
         except Exception as ex:
             reservation_start = None
             reservation_end = None
@@ -54,7 +54,7 @@ class DatabaseHandler:
 
         # Guest Name
         try:
-            guest_name = f"""{data["customer"]["firstName"]} {data["customer"]["lastName"]}"""
+            guest_name = f"""{data["attributes"]["customer"]["name"]} {data["attributes"]["customer"]["surname"]}"""
             guest_name = guest_name.title()
         except Exception as ex:
             guest_name = None
@@ -62,53 +62,36 @@ class DatabaseHandler:
 
         # Guest Origin
         try:
-            guest_origin = f"""{data["customer"]["address"]} {data["customer"]["city"]} {data["customer"]["zipCode"]} {data["customer"]["countryCode"]}"""
+            guest_origin = f"""{data["attributes"]["customer"]["address"]}, {data["attributes"]["customer"]["zip"]} {data["attributes"]["customer"]["city"]}, {data["attributes"]["customer"]["country"]}"""
         except Exception as ex:
             guest_origin = None
             logging.error(f"Could not find guest_origin with exception: {ex}")
 
         # Number and type of guests
+        # Now this is room specific, not booking specific.
         try:
-            adults = 0
-            children = 0
-            guests = data["rooms"][0]["guestCount"]  # List of dicts
-            for g in guests:
-                if g["adult"] == 1:
-                    adults += int(g["count"])
-                else:
-                    children += int(g["count"])
+            adults = int(data["attributes"]["rooms"][room_position]["occupancy"]["adults"])
+            children = int(data["attributes"]["rooms"][room_position]["occupancy"]["children"])
         except Exception as ex:
-            adults = None
-            children = None
+            adults = 1000
+            children = 1000
             logging.error(f"Could not find number of guests with exception: {ex}")
 
         # Nights Price
-        nights_price = self.extract_nights_price(channel_id_z=channel_id_z,
-                                                 reservation_z=reservation_z,
-                                                 flat_name=flat_name)
+        nights_price = self.extract_nights_price(revision, room_position)
 
         # Cleaning Fee
-        cleaning_fee = self.extract_cleaning_fee(channel_id_z=channel_id_z,
-                                                 reservation_z=reservation_z,
-                                                 flat_name=flat_name)
+        cleaning_fee = self.extract_cleaning_fee(revision, room_position)
 
         # Commission Guest
-        try:
-            commission_guest = self.extract_commission_guest(channel_id_z, reservation_z)
-        except Exception as ex:
-            commission_guest = None
-            logging.error(f"Could not find commission_guest with exception: {ex}")
+        commission_guest = data["attributes"]["rooms"][room_position]["ota_commission"]  # FixMe: Find guest commission
 
         # Commission Host
-        try:
-            commission_host = self.extract_commission_host(channel_id_z, reservation_z, cleaning_fee)
-        except Exception as ex:
-            commission_host = None
-            logging.error(f"Could not find commission_host with exception: {ex}")
+        commission_host = data["attributes"]["rooms"][room_position]["ota_commission"]
 
         # Phone
         try:
-            phone = data["customer"]["phone"].replace(" ", "")
+            phone = data["attributes"]["customer"]["phone"].replace(" ", "")
             phone = "+" + phone if "+" not in phone else phone
         except Exception as ex:
             phone = None
@@ -116,21 +99,10 @@ class DatabaseHandler:
 
         # Email
         try:
-            email = data["customer"]["email"].replace(" ", "")
+            email = data["attributes"]["customer"]["mail"]
         except Exception as ex:
             email = None
             logging.error(f"Could not find email with exception: {ex}")
-
-        # Thread ID (Airbnb):
-        try:
-            if str(channel_id_z) == "3":
-                thread_id = reservation_z["fullResponse"]["threadId"]
-            else:
-                logging.info(f"Could not find thread_id because this is a Booking.com reservation.")
-                thread_id = None
-        except Exception as ex:
-            thread_id = None
-            logging.error(f"Could not find thread_id with exception: {ex}")
 
         out = pd.DataFrame([{
             "booking_date": booking_date,
@@ -142,15 +114,14 @@ class DatabaseHandler:
             "guest_origin": guest_origin,
             "adults": adults,
             "children": children,
-            "platform": "Booking" if str(channel_id_z) == "1" else "Airbnb",
+            "platform": "",
             "nights_price": nights_price,
             "cleaning": cleaning_fee,
             "commission_guest": commission_guest,
             "commission_host": commission_host,
             "phone": phone,
             "email": email,
-            "booking_id": booking_id,
-            "thread_id": thread_id
+            "booking_id": booking_id
         }])
         return out
 
@@ -168,35 +139,37 @@ class DatabaseHandler:
 
         return df
 
-    logging.info(f"Extracting price information from reservation data")
+    @staticmethod
+    def extract_nights_price(revision, room_position):
+        logging.info(f"Extracting nights price from reservation data")
+        try:
+            days_breakdown = revision["data"]["attributes"]["rooms"][room_position]["meta"]["days_breakdown"]
+            out = 0
+            for dbd in days_breakdown:
+                logging.info(f"Price on the {dbd['date']}: {dbd['amount']}")
+                out += float(dbd["amount"])
+            logging.info(f"Nights price after computation: {out}")
+        except KeyError:
+            out = 0
+
+        return out
 
     @staticmethod
-    def extract_commission_host(channel_id_z, reservation_z, cleaning_fee):
-        """INCLUDES PAYMENT COMMISSION FOR BOOKING.COM!"""
-        logging.info(f"Extracting host commission from reservation data")
+    def extract_cleaning_fee(revision, room_position):
+        """This actually computes ALL EXTRA FEES to the nights' prices"""
+        logging.info(f"Extracting cleaning fee from reservation data")
         try:
-            if str(channel_id_z) == "1":
-                commission = (-1) * 0.162 * (float(reservation_z["reservations"]["reservation"]["totalPrice"]) + cleaning_fee)
-            else:
-                commission = (-1) * (float(reservation_z["fullResponse"]["hostFeeBaseAccurate"]) + float(reservation_z["fullResponse"]["hostFeeVatAccurate"]))
-        except KeyError as ke:
-            logging.error(f"Error in finding guest commission with error: {ke}. Moving on with 0")
-            commission = 0
+            fees_breakdown = revision["data"]["attributes"]["rooms"][room_position]["taxes"]
+            out = 0
+            for fbd in fees_breakdown:
+                if not fbd["is_inclusive"]:
+                    logging.info(f"Adding fee {fbd['name']} of {fbd['total_price']}")
+                    out += float(fbd['total_price'])
+            logging.info(f"Cleaning fee after computation: {out}")
+        except KeyError:
+            out = 0
 
-        return commission
-
-    @staticmethod
-    def extract_commission_guest(channel_id_z, reservation_z):
-        logging.info(f"Extracting guest commission from reservation data")
-        try:
-            if str(channel_id_z) == "1":
-                commission = 0
-            else:
-                commission = float(reservation_z["fullResponse"]["guestFeeBaseAccurate"]) + float(reservation_z["fullResponse"]["guestFeeVatAccurate"])
-        except KeyError as ke:
-            logging.error(f"Error in finding guest commission with error: {ke}. Moving on with 0")
-            commission = 0
-        return commission
+        return out
 
     @staticmethod
     def force_dtypes(df: pd.DataFrame, dtypes: dict = None):
@@ -213,43 +186,3 @@ class DatabaseHandler:
 
     def close_engine(self):
         self.db_engine.dispose()
-
-    @staticmethod
-    def extract_cleaning_fee(channel_id_z, reservation_z, flat_name):
-        logging.info(f"Extracting cleaning fee from reservation data")
-        try:
-            if str(channel_id_z) == "1":
-                fees = reservation_z["reservations"]["rooms"][0]["priceDetailsExtra"]  # List of extra fees
-                cleaning_fee = 0
-                for f in fees:
-                    if (f["text"] in ["Cleaning fee", "Reinigungsgebühr"]) & (f["type"] == "hotel"):
-                        cleaning_fee += int(float(f["amount"]))
-            else:
-                cleaning_fee = int(float(reservation_z["fullResponse"]["listingCleaningFeeAccurate"]))
-
-            logging.info(f"Cleaning fee after computation: {cleaning_fee}")
-        except KeyError as ke:
-            logging.error(f"Error in finding fees for flat {flat_name}, with error: {ke}. Moving on with fees = 0")
-            cleaning_fee = 0
-
-        return cleaning_fee
-
-    @staticmethod
-    def extract_nights_price(channel_id_z, reservation_z, flat_name):
-        logging.info(f"Extracting nights price from reservation data")
-
-        try:
-            nights_price = float(reservation_z["reservations"]["reservation"]["totalPrice"])
-            if str(channel_id_z) == "3":
-                try:
-                    extras = reservation_z["fullResponse"]["standardFeesDetails"]  # List of extra income fees
-                    for f in extras:
-                        nights_price += int(float(f["amountNative"]))  # Include pet fees and other extras that might pop up.
-                except Exception:
-                    logging.warning(f"Extra fees could not be found. Moving on.")
-            logging.info(f"Nights price after computation: {nights_price}")
-        except KeyError as ke:
-            logging.error(f"Error in finding price for flat {flat_name}, with error: {ke}. Moving on with price = 0!!")
-            nights_price = 0
-
-        return nights_price

@@ -273,3 +273,32 @@ class Zodomus:
 									data=payload)
 		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
 		return response
+
+	def set_rate2(self, channel_id, unit_id_z, room_id_z: str, rate_id_z: str, date_from: pd.Timestamp, min_nights, price: float, currency: str = "EUR"):
+		"""
+		Set a night price
+		If the delta between dates is >1, then the same price will be applied to the range of dates.
+		"""
+		date_to = date_from + pd.Timedelta(days=1) if channel_id != '3' else date_from  # The function should be used for only one day at the time. .
+		payload = json.dumps({
+			"channelId": channel_id,
+			"propertyId": unit_id_z,
+			"roomId": room_id_z,
+			"dateFrom": date_from.strftime("%Y-%m-%d"),
+			"dateTo": date_to.strftime("%Y-%m-%d"),
+			"currencyCode": currency,
+			"rateId": rate_id_z,
+			"prices": {
+				"price": price
+			},
+			"minimumStay": min_nights
+		})
+		# self.logger.info(f"Sending payload {payload} to POST /rates")
+		response = requests.request(auth=self.auth,
+									method="POST",
+									url=f"{self.url}/rates",
+									headers=self.headers,
+									data=payload)
+		self.logger.info(f"Response Status channel {channel_id}: {response.json()['status']['returnMessage']}")
+
+		return response

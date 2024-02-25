@@ -57,7 +57,6 @@ def manage_availability():
         g = Google(secrets=secrets, workbook_id=secrets["google"]["pricing_workbook_id_horizontal"])
         db_engine = create_engine(url=secrets["database"]["url"])
         dbh = DatabaseHandler(db_engine, secrets)
-        offset = g.excel_date(pd.Timestamp.today() - pd.Timedelta(days=15)) - 3  # Rolling window. -3 for 3 headers rows!
 
         # Retrieve the reservation - Needs Zodomus Connection
         reservation_z = z.get_reservation(channel_id=data["channelId"], unit_id_z=data["propertyId"], reservation_number=data["reservationId"]).json()
@@ -115,8 +114,6 @@ def manage_availability():
             logging.info("Availability has been closed in both channels")
             logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
 
-            logging.info(f"Step 3 finishes at timestamp {time.time() - start_time} seconds.")
-
         elif reservation_status_z == '2':  # Modified
             logging.info(f"Modified booking in {flat_name}")
 
@@ -151,7 +148,6 @@ def manage_availability():
                 z.set_availability(channel_id="1", unit_id_z=secrets["flats"][flat_name]["pid_booking"], room_id_z=secrets["flats"][flat_name]["rid_booking"], date_from=new_date_from_today, date_to=new_date_to, availability=0)
                 z.set_availability(channel_id="3", unit_id_z=secrets["flats"][flat_name]["pid_airbnb"], room_id_z=secrets["flats"][flat_name]["rid_airbnb"], date_from=new_date_from_today, date_to=new_date_to+pd.Timedelta(days=-1), availability=0)
                 logging.info(f"New dates have been closed in both channels: {new_date_from.strftime('%Y-%m-%d')} to {new_date_to.strftime('%Y-%m-%d')}")
-
                 logging.info(f"Step 2 finishes at timestamp {time.time() - start_time} seconds.")
 
             except KeyError as ke:
@@ -209,8 +205,8 @@ def manage_availability():
             logging.error(f"reservationStatus not understood: {reservation_status_z}")
 
         # Rewrite all sheet, whatever happened:
-        n = NotesH(secrets=secrets, google=g)
-        n.write_notes()
+        # n = NotesH(secrets=secrets, google=g)
+        # n.write_notes()
 
         dbh.close_engine()
 
@@ -521,7 +517,6 @@ def get_n_guests(reservation_z):
 
 
 def send_email(recipient_email: str, message: str, subject: str = "Check-In instructions"):
-    """For now, only for the properties on the system! The rest is handled by Smoobu."""
     message = Mail(
         from_email='office@host-it.at',
         to_emails=recipient_email,

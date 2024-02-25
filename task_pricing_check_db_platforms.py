@@ -20,7 +20,7 @@ z = Zodomus(secrets=secrets)
 
 logging.info(f"The time right now is: {pd.Timestamp.now()}")
 
-flats = [f[0] for f in secrets["flats"].items() if f[1]["pricing_col"] != ""]
+flats = [f[0] for f in secrets["flats"].items() if "pricing_row" in f[1]]
 
 
 def check_prices():
@@ -67,7 +67,7 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
     # The API only allows for 30 days rates check.
     init_date = pd.Timestamp(db["price_date"].min())
     info_z = []
-    for i in range(1):
+    for i in range(6):
         logging.info(f"Init Date: {init_date}")
         # month_delta goes from 0 to 11. Number of months after the current month.
         min_z_response = z.check_availability(unit_id_z=unit_id_z, channel_id=channel_id_z, date_from=init_date, date_to=init_date + pd.Timedelta(days=30)).json()
@@ -90,7 +90,6 @@ def adjust_prices(z, channel_id_z: str, unit_id_z: str, room_id_z: str, rate_id_
 
 
 def compare_prices(db_row, info_z, channel_id_z, unit_id_z, room_id_z, rate_id_z):
-    time.sleep(2)
     date = db_row["price_date"]
     p_db = int(db_row["price"])
     m_db = int(db_row["min_nights"])
