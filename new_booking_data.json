@@ -1,0 +1,21 @@
+{
+  "timestamp": "2024-02-25T17:03:55.525452Z",
+  "event": "booking_new",
+  "user_id": None,
+  "payload": {
+    "currency": "GBP",
+    "amount": "836.61",
+    "channel_id": "1457d1af-4bf6-467c-ac0d-eed98f833e3c",
+    "property_id": "96387fc7-ba04-4bdd-b487-8d71411f0ce9",
+    "booking_id": "da6c8869-a1bf-481e-aa73-a1ee1d2546c0",
+    "arrival_date": "2024-02-25",
+    "booking_revision_id": "9d407192-c20c-4feb-9e81-ccb4791326fd",
+    "count_of_rooms": 1,
+    "live_feed_event_id": "744fe0ca-9252-4631-8ca8-07b549a1e3a1",
+    "booking_unique_id": "BDC-4088580553",
+    "count_of_nights": 1,
+    "customer_name": "Valentin D"ans",
+    "ota_code": "4088580553"
+  },
+  "property_id": "96387fc7-ba04-4bdd-b487-8d71411f0ce9"
+}

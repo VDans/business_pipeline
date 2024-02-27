@@ -7,10 +7,6 @@ import logging
 import pandas as pd
 from sqlalchemy import create_engine, Table, MetaData, update
 from database_handling import DatabaseHandler
-from zodomus_api import Zodomus
-
-# secrets = json.load(open('config_secrets.json'))
-# db_engine = create_engine(url=secrets["database"]["url"])
 
 
 class Invoice:
@@ -20,37 +16,32 @@ class Invoice:
 
         self.dbh = DatabaseHandler(db_engine, secrets)
 
-    def generate_invoice(self):
+    def generate_invoice(self, data: dict | pd.DataFrame):
         """
         Generate the invoice html with the variables.
         """
-        # --snip-- #
         rendered = render_template('invoice.html',
-                                   invoice_id=invoice_id,
-                                   invoice_date=invoice_date,
+                                   invoice_id=data["invoice_id"],
+                                   invoice_date=data["invoice_date"],
 
-                                   guest_name=guest_name,
-                                   guest_company=guest_company,
-                                   guest_address=guest_address,
-                                   guest_email=guest_email,
-                                   guest_phone=guest_phone,
+                                   guest_name=data["guest_name"],
+                                   guest_company=data["guest_company"],
+                                   guest_address=data["guest_address"],
+                                   guest_email=data["guest_email"],
+                                   guest_phone=data["guest_phone"],
 
-                                   rs_first_name=rs_first_name,
-                                   rs_last_name=rs_last_name,
-                                   rs_company_name=rs_company_name,
-                                   rs_street=rs_street,
-                                   rs_street_number=rs_street_number,
-                                   rs_postal_code=rs_postal_code,
-                                   rs_city=rs_city,
-                                   rs_vat_number=rs_vat_number
-                                   # rs_email=rs_email,
-                                   # rs_phone=rs_phone,
-                                   # rs_company_registry_number=rs_company_registry_number
+                                   rs_first_name=data["rs_first_name"],
+                                   rs_last_name=data["rs_last_name"],
+                                   rs_company_name=data["rs_company_name"],
+                                   rs_street=data["rs_street"],
+                                   rs_street_number=data["rs_street_number"],
+                                   rs_postal_code=data["rs_postal_code"],
+                                   rs_city=data["rs_city"],
+                                   rs_vat_number=data["rs_vat_number"],
+                                   # rs_email=data["rs_email"],
+                                   # rs_phone=data["rs_phone"],
+                                   # rs_company_registry_number=data["rs_company_registry_number"],
 
                                    )
         html = HTML(string=rendered)
         rendered_pdf = html.write_pdf('invoice.pdf')
-
-        # return send_file(
-        #     'invoice.pdf'
-        # )
